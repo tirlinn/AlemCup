@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define value 4
+#define value 6
 
 struct cell
 {
@@ -24,7 +24,7 @@ void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, 
 void fill_bomb(struct cell** map, struct bot* Deidara, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
 int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
 void fill_path(struct cell** map, struct bot* Deidara, int h, int w);
-void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb);
+void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
 void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
@@ -261,12 +261,12 @@ int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than)
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef)
 {
     int a = 0;
-    if (Deidara->f_a > Deidara->a_a) 
+    if (Deidara->f_a > Deidara->a_a)
         Deidara->a_a = Deidara->f_a;
     //fprintf(stderr, "COEFF and a_a %d %d \n", 8 * coef / 100, Deidara->a_a);
     if (ent_type == 'a')
     {
-        if (Deidara->a_a == 1 )
+        if (Deidara->a_a == 1)
             map[y][x].goal += 8 * coef / 100;
     }
 
@@ -351,10 +351,11 @@ void fill_path(struct cell** map, struct bot* Deidara, int h, int w)
     int x = Deidara->x;
     int y = Deidara->y;
     int bomb = 0;
-    get_point(map, y, x, step, prev, h, w, bomb);
+    int deep = 0;
+    get_point(map, y, x, step, prev, h, w, bomb, deep);
 }
 
-void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb)
+void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep)
 {
     //if (step >= 30) return;
     if (step == 0)
@@ -388,13 +389,13 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
         return;
 
     if (prev != 'L' && x + 1 < w)
-        get_point(map, y, x + 1, step, 'R', h, w, bomb);
+        get_point(map, y, x + 1, step, 'R', h, w, bomb, deep);
     if (prev != 'U' && y + 1 < h)
-        get_point(map, y + 1, x, step, 'D', h, w, bomb);
+        get_point(map, y + 1, x, step, 'D', h, w, bomb, deep);
     if (prev != 'R' && x - 1 >= 0)
-        get_point(map, y, x - 1, step, 'L', h, w, bomb);
+        get_point(map, y, x - 1, step, 'L', h, w, bomb, deep);
     if (prev != 'D' && y - 1 >= 0)
-        get_point(map, y - 1, x, step, 'U', h, w, bomb);
+        get_point(map, y - 1, x, step, 'U', h, w, bomb, deep);
 }
 
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick)
@@ -412,7 +413,7 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
             }
             else
                 map[i][j].goal -= map[i][j].path; //+ up to tick or path
-            if (map[i][j].goal > map[aim->y][aim->x].goal) 
+            if (map[i][j].goal > map[aim->y][aim->x].goal)
             {
                 aim->y = i;
                 aim->x = j;
@@ -433,7 +434,7 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
     }
 }
 
-void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir) 
+void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir)
 {
     int anti_timeout = 0;
     int y = aim->y;
@@ -451,7 +452,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         *dir = 4;
         return;
     }
-    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == 12)
+    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2)
     {
         *dir = 4;
         return;
