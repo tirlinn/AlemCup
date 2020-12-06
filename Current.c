@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define value 6
+#define value 4
 
 struct cell
 {
@@ -100,7 +100,7 @@ int main(void)
         final_map(map, Deidara, h, w, aim, min_tick);
 
         int dir = 5;
-
+        fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
         find_dir(map, Deidara, aim, h, w, &dir);
 
         const char actions[][10] = { "left", "right", "up", "down", "bomb", "stay" };
@@ -267,13 +267,13 @@ void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, 
     if (ent_type == 'a')
     {
         if (Deidara->a_a == 1)
-            map[y][x].goal += 8 * coef / 100;
+            map[y][x].goal += 10 * coef / 100;
     }
 
     if (ent_type == 'l')
     {
-        if (Deidara->f_r == 2)
-            map[y][x].goal += 8 * coef / 100;
+        if (Deidara->f_r == 2 || Deidara->f_r == 3)
+            map[y][x].goal += 10 * coef / 100;
     }
 }
 
@@ -400,6 +400,9 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
 
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick)
 {
+    if (map[Deidara->y][Deidara->x].goal == 0)
+        map[Deidara->y][Deidara->x].goal = -135;
+
     for (int i = 0; i < h; i++)
     {
         for (int j = 0; j < w; j++)
@@ -417,6 +420,7 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
             {
                 aim->y = i;
                 aim->x = j;
+                //fprintf(stderr, "aim changed to %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
             }
             else if (map[i][j].goal == map[aim->y][aim->x].goal)
             {
@@ -428,6 +432,7 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
                 {
                     aim->y = i;
                     aim->x = j;
+                    //fprintf(stderr, "aim changed to %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
                 }
             }
         }
@@ -444,21 +449,25 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
 
     if (y == Deidara->y && x == Deidara->x)
     {
+        fprintf(stderr, "Bomb plant case 1 %d %d \n", y, x);
         *dir = 4;
         return;
     }
     else if ((map[aim->y][aim->x].path >= 5 && map[aim->y][aim->x].path > Deidara->f_r) && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 0)
     {
+        fprintf(stderr, "Bomb plant case 2 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
         *dir = 4;
         return;
     }
     else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2)
     {
+        fprintf(stderr, "Bomb plant case 3 %d %d %d\n", aim->y, aim->x, Deidara->f_r);
         *dir = 4;
         return;
     }
     else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 1)
     {
+        fprintf(stderr, "Bomb plant case 4 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
         *dir = 4;
         return;
     }
