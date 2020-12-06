@@ -6,7 +6,7 @@
 
 struct cell
 {
-    int box, path, goal, delay, tunnel, enemy_path, enemy_goal;
+    int box, path, goal, delay, tunnel, enemy_delay, enemy_path, enemy_goal;
 };
 
 struct bot
@@ -153,6 +153,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
     map[i][j].path = 1000;
     map[i][j].goal = 0;
     map[i][j].delay = 0;
+    map[i][j].enemy_delay = 0;
     map[i][j].enemy_path = 1000;
     map[i][j].enemy_goal = 0;
 }
@@ -504,13 +505,13 @@ void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h,
     if (step == 0)
     {
         map[y][x].enemy_path = step++;
-        map[y][x].delay = 0;
+        map[y][x].enemy_delay = 0;
         bomb = 0;
     }
     else if (map[y][x].box == 1 && step < map[y][x].enemy_path)
     {
         map[y][x].enemy_path = step++;
-        map[y][x].delay = 0;
+        map[y][x].enemy_delay = 0;
         bomb = 0;
     }
     else if (map[y][x].box < 0 && step < map[y][x].enemy_path)
@@ -519,13 +520,13 @@ void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h,
         if (map[y][x].box != -1 * step)
         {
             map[y][x].enemy_path = step++;
-            map[y][x].delay = 0;
+            map[y][x].enemy_delay = 0;
         }
         else
         {
             step += bomb;
             map[y][x].enemy_path = step++;
-            map[y][x].delay = bomb;
+            map[y][x].enemy_delay = bomb;
         }
     }
     else
