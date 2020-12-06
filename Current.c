@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,9 +20,9 @@ struct pos
 };
 
 void fill_map(struct cell** map, char* line, int i, int j, int* box_number);
-void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick);
+void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick, int* enemy_min_tick);
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef);
-void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick, int* enemy_min_tick);
 int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
 void fill_path(struct cell** map, struct bot* Deidara, int h, int w);
 void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
@@ -79,6 +78,7 @@ int main(void)
         fprintf(stderr, "number of entities - %d\n", n);
         int coef = (current_number * 100 / box_number) + 10;
         int min_tick = 0;
+        int enemy_min_tick = 0;
         // read entities
         for (int i = 0; i < 2 * (n - 1) + 1; i++)
         {
@@ -93,7 +93,7 @@ int main(void)
                     ent_type = 'l';
             }
             scanf("%d%d%d%d%d", &p_id, &x, &y, &param_1, &param_2);
-            fill_entity(map, Deidara, Saken, ent_type, p_id, x, y, param_1, param_2, player_id, h, w, coef, &min_tick);
+            fill_entity(map, Deidara, Saken, ent_type, p_id, x, y, param_1, param_2, player_id, h, w, coef, &min_tick, &enemy_min_tick);
         }
 
         fill_goal(map, Deidara, h, w);
@@ -111,7 +111,7 @@ int main(void)
         struct pos* enemy_aim = malloc(sizeof(struct pos));
         enemy_aim->y = Saken->y;
         enemy_aim->x = Saken->x;
-        final_enemy_map(map, Saken, h, w, enemy_aim, min_tick);
+        final_enemy_map(map, Saken, h, w, enemy_aim, enemy_min_tick);
 
         int dir = 5;
         fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
@@ -157,7 +157,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
     map[i][j].enemy_goal = 0;
 }
 
-void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick)
+void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick, int* enemy_min_tick)
 {
     switch (ent_type)
     {
@@ -181,7 +181,7 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
         break;
 
     case 'b':
-        fill_bomb(map, Deidara, Saken, p_id, x, y, param_1, param_2, h, w, player_id, min_tick);
+        fill_bomb(map, Deidara, Saken, p_id, x, y, param_1, param_2, h, w, player_id, min_tick, enemy_min_tick);
         fprintf(stderr, "bomb: x - %d, y - %d, tick - %d, radius - %d\n", x, y, param_1, param_2);
         break;
 
@@ -199,14 +199,18 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
     }
 }
 
-void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick)
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick, int* enemy_min_tick)
 {
     int less_than = 5 - Deidara->f_r;
     
-
     if (player_id == p_id && Deidara->f_a == 0)
     {
         if (*min_tick == 0 || *min_tick > param_1)
+            *min_tick = param_1;
+    }
+    if (player_id != p_id && Saken->f_a == 0)
+    {
+        if (*enemy_min_tick == 0 || *enemy_min_tick > param_1)
             *min_tick = param_1;
     }
 
