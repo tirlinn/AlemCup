@@ -26,6 +26,7 @@ void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_
 int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
 void fill_path(struct cell** map, struct bot* Deidara, int h, int w);
 void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
+void get_tunnels(struct cell** map, int y, int x, int deep, int h, int w);
 void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
@@ -156,6 +157,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
     map[i][j].enemy_delay = 0;
     map[i][j].enemy_path = 1000;
     map[i][j].enemy_goal = 0;
+    map[i][j].tunnel = 1000;
 }
 
 void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick, int* enemy_min_tick)
@@ -448,6 +450,26 @@ void fill_path(struct cell** map, struct bot* Deidara, int h, int w)
 
 void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep)
 {
+    int deadend = 0;
+    if (map[y][x].box == 1)
+    {
+        if (y - 1 < 0) deadend++;
+        else if (map[y-1][x].box > 1) deadend++;
+        if (y + 1 >= h) deadend++;
+        else if (map[y+1][x].box > 1) deadend++;
+        if (x - 1 < 0) deadend++;
+        else if (map[y][x-1].box > 1) deadend++;
+        if (x + 1 >= w) deadend++;
+        else if (map[y][x+1].box > 1) deadend++;
+        if (deadend == 3)
+        {
+            map[y][x].tunnel = 1;
+            if (y - 1 >= 0) if (map[y-1][x].path != 1000) get_tunnels(map, y - 1, x, 1, h, w);
+            if (y + 1 < h)  if (map[y+1][x].path != 1000) get_tunnels(map, y + 1, x, 1, h, w);
+            if (x - 1 >= 0) if (map[y][x-1].path != 1000) get_tunnels(map, y, x - 1, 1, h, w);
+            if (x + 1 < w) if (map[y][x+1].path != 1000) get_tunnels(map, y, x + 1, 1, h, w);
+        }
+    }
     //if (step >= 30) return;
     if (step == 0)
     {
@@ -487,6 +509,39 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
         get_point(map, y, x - 1, step, 'L', h, w, bomb, deep);
     if (prev != 'D' && y - 1 >= 0)
         get_point(map, y - 1, x, step, 'U', h, w, bomb, deep);
+}
+
+void get_tunnels(struct cell** map, int y, int x, int deep, int h, int w)
+{
+    int deadend = 0;
+    if (y - 1 < 0) deadend++;
+    else if (map[y-1][x].box > 1) deadend++;
+    if (y + 1 >= h) deadend++;
+    else if (map[y+1][x].box > 1) deadend++;
+    if (x - 1 < 0) deadend++;
+    else if (map[y][x-1].box > 1) deadend++;
+    if (x + 1 >= w) deadend++;
+    else if (map[y][x+1].box > 1) deadend++;
+    if (deadend == 2)
+    {
+        map[y][x].tunnel = deep + 1;
+        if (y - 1 >= 0)
+        {
+            if (map[y-1][x].path != 1000 && map[y][x].tunnel < map[y-1][x].tunnel) get_tunnels(map, y - 1, x, map[y][x].tunnel, h, w);
+        }
+        if (y + 1 < h)
+        {
+            if (map[y+1][x].path != 1000 && map[y][x].tunnel < map[y+1][x].tunnel) get_tunnels(map, y + 1, x, map[y][x].tunnel, h, w);
+        }
+        if (x - 1 >= 0)
+        {
+            if (map[y][x-1].path != 1000 && map[y][x].tunnel < map[y][x-1].tunnel) get_tunnels(map, y, x - 1, map[y][x].tunnel, h, w);
+        }
+        if (x + 1 < w)
+        {
+            if (map[y][x+1].path != 1000 && map[y][x].tunnel < map[y][x+1].tunnel) get_tunnels(map, y, x + 1, map[y][x].tunnel, h, w);
+        }
+    }
 }
 
 void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w)
@@ -756,6 +811,16 @@ void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy
         for (int j = 0; j < w; j++)
         {
             fprintf(stderr, "%4d ", map[i][j].box);
+        }
+        fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+    for (int i = 0; i < h; i++)
+    {
+        fprintf(stderr, "tunnel: ");
+        for (int j = 0; j < w; j++)
+        {
+            fprintf(stderr, "%4d ", map[i][j].tunnel);
         }
         fprintf(stderr, "\n");
     }
