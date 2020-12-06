@@ -1,11 +1,13 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #define value 4
+#define enemy_value 6
 
 struct cell
 {
-    int box, path, goal, delay, tunnel;
+    int box, path, goal, delay, tunnel, enemy_path, enemy_goal;
 };
 
 struct bot
@@ -21,7 +23,7 @@ struct pos
 void fill_map(struct cell** map, char* line, int i, int j, int* box_number);
 void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick);
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef);
-void fill_bomb(struct cell** map, struct bot* Deidara, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
 int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
 void fill_path(struct cell** map, struct bot* Deidara, int h, int w);
 void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
@@ -29,7 +31,12 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
-void freentf(struct cell** map, int h, int w, struct pos* aim);
+void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim);
+void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, int w);
+void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w);
+void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w);
+void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int min_tick);
 int my_abs_dif(int n1, int n2);
 
 int main(void)
@@ -90,14 +97,21 @@ int main(void)
         }
 
         fill_goal(map, Deidara, h, w);
+        fill_enemy_goal(map, Saken, h, w);
 
         fill_path(map, Deidara, h, w);
+        fill_enemy_path(map, Saken, h, w);
 
         struct pos* aim = malloc(sizeof(struct pos));
         aim->y = Deidara->y;
         aim->x = Deidara->x;
         fprintf(stderr, "Min tick %d\n", min_tick);
         final_map(map, Deidara, h, w, aim, min_tick);
+        
+        struct pos* enemy_aim = malloc(sizeof(struct pos));
+        enemy_aim->y = Saken->y;
+        enemy_aim->x = Saken->x;
+        final_enemy_map(map, Saken, h, w, enemy_aim, min_tick);
 
         int dir = 5;
         fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
@@ -109,7 +123,7 @@ int main(void)
         printf("%s\n", actions[dir]);
         fflush(stdout);
 
-        freentf(map, h, w, aim);
+        freentf(map, h, w, aim, enemy_aim);
     }
     free(Saken);
     free(Deidara);
@@ -139,6 +153,8 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
     map[i][j].path = 1000;
     map[i][j].goal = 0;
     map[i][j].delay = 0;
+    map[i][j].enemy_path = 1000;
+    map[i][j].enemy_goal = 0;
 }
 
 void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick)
@@ -165,7 +181,7 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
         break;
 
     case 'b':
-        fill_bomb(map, Deidara, p_id, x, y, param_1, param_2, h, w, player_id, min_tick);
+        fill_bomb(map, Deidara, Saken, p_id, x, y, param_1, param_2, h, w, player_id, min_tick);
         fprintf(stderr, "bomb: x - %d, y - %d, tick - %d, radius - %d\n", x, y, param_1, param_2);
         break;
 
@@ -183,9 +199,10 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
     }
 }
 
-void fill_bomb(struct cell** map, struct bot* Deidara, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick)
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick)
 {
     int less_than = 5 - Deidara->f_r;
+    
 
     if (player_id == p_id && Deidara->f_a == 0)
     {
@@ -289,6 +306,18 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w)
     }
 }
 
+void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w)
+{
+    for (int i = 0; i < h; i++)
+    {
+        for (int j = 0; j < w; j++)
+        {
+            if (map[i][j].box == 10)
+                fill_enemy_box(map, Saken, i, j, h, w);
+        }
+    }
+}
+
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w)
 {
     for (int i = 1; i <= Deidara->f_r; i++)
@@ -338,6 +367,63 @@ void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w
         if (map[tmp_y][x].box == 1)
         {
             map[tmp_y][x].goal += value;
+        }
+        else
+            break;
+    }
+}
+
+void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, int w)
+{
+    for (int i = 1; i <= Saken->f_r; i++)
+    {
+        int tmp_x = x + i;
+        if (tmp_x >= w) break;
+
+        if (map[y][tmp_x].box == 1)
+        {
+            map[y][tmp_x].enemy_goal += enemy_value;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    for (int i = 1; i <= Saken->f_r; i++)
+    {
+        int tmp_x = x - i;
+        if (tmp_x < 0) break;
+
+        if (map[y][tmp_x].box == 1)
+        {
+            map[y][tmp_x].enemy_goal += enemy_value;
+        }
+        else
+            break;
+    }
+
+    for (int i = 1; i <= Saken->f_r; i++)
+    {
+        int tmp_y = y + i;
+        if (tmp_y >= h) break;
+
+        if (map[tmp_y][x].box == 1)
+        {
+            map[tmp_y][x].enemy_goal += enemy_value;
+        }
+        else
+            break;
+    }
+
+    for (int i = 1; i <= Saken->f_r; i++)
+    {
+        int tmp_y = y - i;
+        if (tmp_y < 0) break;
+
+        if (map[tmp_y][x].box == 1)
+        {
+            map[tmp_y][x].enemy_goal += enemy_value;
         }
         else
             break;
@@ -398,6 +484,59 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
         get_point(map, y - 1, x, step, 'U', h, w, bomb, deep);
 }
 
+void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w)
+{
+    int step = 0;
+    char prev = 0;
+    int x = Saken->x;
+    int y = Saken->y;
+    int bomb = 0;
+    int deep = 0;
+    get_enemy_point(map, y, x, step, prev, h, w, bomb, deep);
+}
+
+void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep)
+{
+    if (step == 0)
+    {
+        map[y][x].enemy_path = step++;
+        map[y][x].delay = 0;
+        bomb = 0;
+    }
+    else if (map[y][x].box == 1 && step < map[y][x].enemy_path)
+    {
+        map[y][x].enemy_path = step++;
+        map[y][x].delay = 0;
+        bomb = 0;
+    }
+    else if (map[y][x].box < 0 && step < map[y][x].enemy_path)
+    {
+        bomb++;
+        if (map[y][x].box != -1 * step)
+        {
+            map[y][x].enemy_path = step++;
+            map[y][x].delay = 0;
+        }
+        else
+        {
+            step += bomb;
+            map[y][x].enemy_path = step++;
+            map[y][x].delay = bomb;
+        }
+    }
+    else
+        return;
+
+    if (prev != 'L' && x + 1 < w)
+        get_enemy_point(map, y, x + 1, step, 'R', h, w, bomb, deep);
+    if (prev != 'U' && y + 1 < h)
+        get_enemy_point(map, y + 1, x, step, 'D', h, w, bomb, deep);
+    if (prev != 'R' && x - 1 >= 0)
+        get_enemy_point(map, y, x - 1, step, 'L', h, w, bomb, deep);
+    if (prev != 'D' && y - 1 >= 0)
+        get_enemy_point(map, y - 1, x, step, 'U', h, w, bomb, deep);
+}
+
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick)
 {
     if (map[Deidara->y][Deidara->x].goal == 0)
@@ -433,6 +572,47 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
                     aim->y = i;
                     aim->x = j;
                     //fprintf(stderr, "aim changed to %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
+                }
+            }
+        }
+    }
+}
+
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int min_tick)
+{
+    if (map[Saken->y][Saken->x].enemy_goal == 0)
+        map[Saken->y][Saken->x].enemy_goal = -135;
+
+    for (int i = 0; i < h; i++)
+    {
+        for (int j = 0; j < w; j++)
+        {
+            if (map[i][j].enemy_goal == 0)
+                map[i][j].enemy_goal = -135;
+            if (min_tick != 0)
+            {
+                if (min_tick <= map[i][j].enemy_path)
+                    map[i][j].enemy_goal -= (map[i][j].enemy_path - min_tick);
+            }
+            else
+                map[i][j].enemy_goal -= map[i][j].enemy_path; //+ up to tick or path
+            if (map[i][j].enemy_goal > map[enemy_aim->y][enemy_aim->x].enemy_goal)
+            {
+                enemy_aim->y = i;
+                enemy_aim->x = j;
+                //fprintf(stderr, "aim changed to %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
+            }
+            else if (map[i][j].enemy_goal == map[enemy_aim->y][enemy_aim->x].enemy_goal)
+            {
+                int middle_x = w / 2;
+                int middle_y = h / 2;
+                int aim_dif = my_abs_dif(enemy_aim->y, middle_y) + my_abs_dif(enemy_aim->x, middle_x);
+                int cur_dif = my_abs_dif(i, middle_y) + my_abs_dif(j, middle_x);
+                if (cur_dif < aim_dif)
+                {
+                    enemy_aim->y = i;
+                    enemy_aim->x = j;
+                    fprintf(stderr, "aim changed to %d %d %d\n", map[enemy_aim->y][enemy_aim->x].goal, enemy_aim->y, enemy_aim->x);
                 }
             }
         }
@@ -561,7 +741,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
     }
 }
 
-void freentf(struct cell** map, int h, int w, struct pos* aim)
+void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim)
 {
     // print maps
     fprintf(stderr, "\n");
@@ -595,11 +775,32 @@ void freentf(struct cell** map, int h, int w, struct pos* aim)
         fprintf(stderr, "\n");
     }
     fprintf(stderr, "\n");
+    for (int i = 0; i < h; i++)
+    {
+        fprintf(stderr, "enemy_path: ");
+        for (int j = 0; j < w; j++)
+        {
+            fprintf(stderr, "%5d ", map[i][j].enemy_path);
+        }
+        fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+    for (int i = 0; i < h; i++)
+    {
+        fprintf(stderr, "enemy_goal: ");
+        for (int j = 0; j < w; j++)
+        {
+            fprintf(stderr, "%5d ", map[i][j].enemy_goal);
+        }
+        fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
     //free part
     for (int i = 0; i < w; i++)
     {
         free(map[i]);
     }
+    free(enemy_aim);
     free(aim);
     free(map);
 }
