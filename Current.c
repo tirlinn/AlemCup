@@ -31,7 +31,7 @@ void get_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, i
 void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w);
-void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w);
+int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int anti_timeout);
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
@@ -182,7 +182,7 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
     int wait = 0;
     struct pos next = { -1, -1 };
 
-    if (map[aim->y][aim->x].box < 0)
+    if (map[aim->y][aim->x].box != 1)
     {
         return 1;
     }
@@ -289,7 +289,11 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
     if (map[enemy_aim->y][enemy_aim->x].tunnel < 0)
     {
         struct pos* tmp_aim = malloc(sizeof(struct pos));
-        find_trap_pos(map, tmp_aim, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Saken->f_r + 1, h, w);
+        if (!find_trap_pos(map, tmp_aim, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Saken->f_r + 1, h, w, 1))
+        {
+            fprintf(stderr, "anti_timeout find_trap_pos");
+            return 0;
+        }
         if (map[tmp_aim->y][tmp_aim->x].path <= map[enemy_aim->y][enemy_aim->x].enemy_path)
         {
             fprintf(stderr, "Found a case to kill and we have extra %d steps.\n", map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path);
@@ -323,19 +327,21 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
     return 0;
 }
 
-void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w)
+int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int anti_timeout)
 {
+    anti_timeout++; // temporary solution!
+    if (anti_timeout == 100) return 0;
     if (y - 1 >= 0)
     {
         if (my_abs(map[y - 1][x].tunnel) == fin_value || my_abs(map[y - 1][x].tunnel) > 100)
         {
             tmp_aim->y = y - 1;
             tmp_aim->x = x;
-            return;
+            return 1;
         }
         else if (my_abs(map[y - 1][x].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y - 1, x, fin_value, h, w);
+            find_trap_pos(map, tmp_aim, y - 1, x, fin_value, h, w, anti_timeout);
         }
     }
     if (y + 1 < h)
@@ -344,11 +350,11 @@ void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         {
             tmp_aim->y = y + 1;
             tmp_aim->x = x;
-            return;
+            return 1;
         }
         else if (my_abs(map[y + 1][x].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y + 1, x, fin_value, h, w);
+            find_trap_pos(map, tmp_aim, y + 1, x, fin_value, h, w, anti_timeout);
         }
     }
     if (x - 1 >= 0)
@@ -357,11 +363,11 @@ void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         {
             tmp_aim->y = y;
             tmp_aim->x = x - 1;
-            return;
+            return 1;
         }
         else if (my_abs(map[y][x - 1].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y, x - 1, fin_value, h, w);
+            find_trap_pos(map, tmp_aim, y, x - 1, fin_value, h, w, anti_timeout);
         }
     }
     if (x + 1 < w)
@@ -370,11 +376,11 @@ void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         {
             tmp_aim->y = y;
             tmp_aim->x = x + 1;
-            return;
+            return 1;
         }
         else if (my_abs(map[y][x + 1].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w);
+            find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
         }
     }
 }
