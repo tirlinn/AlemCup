@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #define value 4
-#define enemy_value 4
+#define enemy_value 6
 
 struct cell
 {
@@ -291,16 +291,6 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
                 aim->x = tmp_aim->x;
                 free(tmp_aim);
                 return 1;
-            }
-            else if (map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path == -1)
-            {
-                if (my_abs(enemy_aim->y - tmp_aim->y) + my_abs(enemy_aim->x - tmp_aim->x) > 1)
-                {
-                    aim->y = tmp_aim->y;
-                    aim->x = tmp_aim->x;
-                    free(tmp_aim);
-                    return 1;
-                }
             }
         }
         free(tmp_aim);
@@ -1051,25 +1041,13 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         if (*dir == 3) y--;
         if (*dir == 0) x++;
         if (*dir == 2) y++;
-        fprintf(stderr, "Dir is %d\n", *dir);
+        //fprintf(stderr, "Dir is %d\n", *dir);
         if (anti_timeout < 50) anti_timeout++;
         else if (anti_timeout >= 50)
         {
+            //*dir = rand() % 4; IMPORTANT FOR REAL ARENA BOT
+            fprintf(stderr, "Find_dir timeout.\n");
             *dir = 5;
-
-            fprintf(stderr, "ALERT ALERT ALERT ALERT Find_dir timeout.\n");
-            /*if (x - 1 >= 0) //ACTIVATE FOR ARENA
-                if (map[y][x - 1].box <= 1)
-                    *dir = 0;
-            if (y - 1 >= 0)
-                if (map[y - 1][x].box <= 1)
-                    *dir = 2;
-            if (x + 1 < w)
-                if (map[y][x + 1].box <= 1)
-                    *dir = 1;
-            if (y + 1 < h)
-                if (map[y + 1][x].box <= 1)
-                    *dir = 3;*/
             break;
         }
     }
