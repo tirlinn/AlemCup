@@ -35,7 +35,7 @@ void find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
-void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim);
+void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim);
 void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, int w);
 void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w);
 void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w);
@@ -121,23 +121,30 @@ int main(void)
         }
         
         struct pos* enemy_aim = malloc(sizeof(struct pos));
-        struct pos* aim = malloc(sizeof(struct pos));
+        struct pos* kill_aim = malloc(sizeof(struct pos));
         int kill_command = 0;
+
         if (Saken->x != -1)
         {
             enemy_aim->y = Saken->y;
             enemy_aim->x = Saken->x;
             fprintf(stderr, "before fill enemy map\n");
-            final_enemy_map(map, Saken, h, w, enemy_aim, enemy_min_tick);
-            fprintf(stderr, "before kill_bot\n");
-            kill_command = kill_bot(map, Saken, aim, enemy_aim, h, w);
+            final_enemy_map(map, Saken, h, w, enemy_aim, enemy_min_tick); 
         }
         int dir = 5;
 
+        struct pos* aim = malloc(sizeof(struct pos));
         aim->y = Deidara->y;
         aim->x = Deidara->x;
         fprintf(stderr, "Min tick %d\n", min_tick);
         final_map(map, Deidara, h, w, aim, min_tick);
+
+        if (Saken->x != -1)
+        {
+            fprintf(stderr, "before kill_bot\n");
+            kill_command = kill_bot(map, Saken, kill_aim, enemy_aim, h, w);
+        }
+
         if (kill_command == 0)
         {
             fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
@@ -145,10 +152,11 @@ int main(void)
         }
         else
         {
-            fprintf(stderr, "Final aim to kill is %d %d %d Enemy %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x, enemy_aim->y, enemy_aim->x);
-            int failure = target_acqured(map, Deidara, Saken, aim, enemy_aim, h, w, &dir);
+            fprintf(stderr, "Final aim to kill is %d %d %d Enemy %d %d\n", map[aim->y][aim->x].goal, kill_aim->y, kill_aim->x, enemy_aim->y, enemy_aim->x);
+            int failure = target_acqured(map, Deidara, Saken, kill_aim, enemy_aim, h, w, &dir);
             if (failure == 1)
             {
+                fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
                 find_dir(map, Deidara, aim, h, w, &dir);
             }
         }
@@ -159,7 +167,7 @@ int main(void)
         printf("%s\n", actions[dir]);
         fflush(stdout);
 
-        freentf(map, h, w, aim, enemy_aim);
+        freentf(map, h, w, aim, enemy_aim, kill_aim);
     }
     free(Saken);
     free(Deidara);
@@ -189,7 +197,7 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
         {
             *dir = 5;
         }
-        return;
+        return 0;
     }
 
     while (y != Deidara->y || x != Deidara->x)
@@ -301,6 +309,13 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
                     free(tmp_aim);
                     return 1;
                 }
+            }
+            else if (aim->y == enemy_aim->y && aim->x == enemy_aim->x)
+            {
+                aim->y = tmp_aim->y;
+                aim->x = tmp_aim->x;
+                free(tmp_aim);
+                return 1;
             }
         }
         free(tmp_aim);
@@ -1086,7 +1101,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
     }
 }
 
-void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim)
+void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim)
 {
     // print maps
     fprintf(stderr, "\n");
@@ -1157,6 +1172,7 @@ void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy
     }
     free(enemy_aim);
     free(aim);
+    free(kill_aim);
     free(map);
 }
 
