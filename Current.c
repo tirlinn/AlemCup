@@ -32,7 +32,7 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w);
 int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int anti_timeout);
-void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick);
+void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int *min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
 void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim);
@@ -40,7 +40,7 @@ void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, i
 void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w);
 void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w);
 void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb, int deep);
-void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int min_tick);
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int* min_tick);
 int my_abs_dif(int n1, int n2);
 int my_abs(int n);
 
@@ -129,7 +129,7 @@ int main(void)
             enemy_aim->y = Saken->y;
             enemy_aim->x = Saken->x;
             fprintf(stderr, "before fill enemy map\n");
-            final_enemy_map(map, Saken, h, w, enemy_aim, enemy_min_tick); 
+            final_enemy_map(map, Saken, h, w, enemy_aim, &enemy_min_tick); 
         }
         int dir = 5;
 
@@ -137,7 +137,7 @@ int main(void)
         aim->y = Deidara->y;
         aim->x = Deidara->x;
         fprintf(stderr, "Min tick %d\n", min_tick);
-        final_map(map, Deidara, h, w, aim, min_tick);
+        final_map(map, Deidara, h, w, aim, &min_tick);
 
         if (Saken->x != -1)
         {
@@ -891,10 +891,15 @@ void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h,
         get_enemy_point(map, y - 1, x, step, 'U', h, w, bomb, deep);
 }
 
-void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int min_tick)
+void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int* min_tick)
 {
     if (map[Deidara->y][Deidara->x].goal == 0)
         map[Deidara->y][Deidara->x].goal = -135;
+
+    if (Deidara->f_a != 0 && *min_tick != 0)
+    {
+        *min_tick = 0;
+    }
 
     for (int i = 0; i < h; i++)
     {
@@ -902,10 +907,10 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
         {
             if (map[i][j].goal == 0)
                 map[i][j].goal = -135;
-            if (min_tick != 0)
+            if (*min_tick != 0)
             {
-                if (min_tick <= map[i][j].path)
-                    map[i][j].goal -= (map[i][j].path - min_tick);
+                if (*min_tick <= map[i][j].path)
+                    map[i][j].goal -= (map[i][j].path - *min_tick);
             }
             else
                 map[i][j].goal -= map[i][j].path; //+ up to tick or path
@@ -932,10 +937,15 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
     }
 }
 
-void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int min_tick)
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int* min_tick)
 {
     if (map[Saken->y][Saken->x].enemy_goal == 0)
         map[Saken->y][Saken->x].enemy_goal = -135;
+
+    if (Saken->f_a != 0 && *min_tick != 0)
+    {
+        *min_tick = 0;
+    }
 
     for (int i = 0; i < h; i++)
     {
@@ -943,10 +953,10 @@ void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct 
         {
             if (map[i][j].enemy_goal == 0)
                 map[i][j].enemy_goal = -135;
-            if (min_tick != 0)
+            if (*min_tick != 0)
             {
-                if (min_tick <= map[i][j].enemy_path)
-                    map[i][j].enemy_goal -= (map[i][j].enemy_path - min_tick);
+                if (*min_tick <= map[i][j].enemy_path)
+                    map[i][j].enemy_goal -= (map[i][j].enemy_path - *min_tick);
             }
             else
                 map[i][j].enemy_goal -= map[i][j].enemy_path; //+ up to tick or path
