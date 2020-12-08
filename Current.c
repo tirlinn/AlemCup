@@ -340,6 +340,7 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
             }
             else if (map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path == -1)
             {
+                fprintf(stderr, "Else if in kill bot 1\n");
                 if (my_abs(enemy_aim->y - tmp_aim->y) + my_abs(enemy_aim->x - tmp_aim->x) > 1)
                 {
                     aim->y = tmp_aim->y;
@@ -350,6 +351,7 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
             }
             else if (aim->y == enemy_aim->y && aim->x == enemy_aim->x)
             {
+                fprintf(stderr, "Else if in kill bot 2\n");
                 aim->y = tmp_aim->y;
                 aim->x = tmp_aim->x;
                 free(tmp_aim);
