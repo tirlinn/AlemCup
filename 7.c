@@ -36,12 +36,12 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
 int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int assassin);
 int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int* anti_timeout);
-void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int *min_tick);
+void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int* min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir, int assassin, int block);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir, int* trapped);
 void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim);
 void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, int w);
-void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w);
+void fill_enemy_goal(struct cell** map, struct bot* Saken, int h, int w);
 void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w);
 void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb);
 void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int* min_tick);
@@ -126,7 +126,7 @@ int main(void)
             fprintf(stderr, "before fill enemy path\n");
             fill_enemy_path(map, Saken, h, w);
         }
-        
+
         struct pos* enemy_aim = malloc(sizeof(struct pos));
         struct pos* kill_aim = malloc(sizeof(struct pos));
         int kill_command = 0;
@@ -136,7 +136,7 @@ int main(void)
             enemy_aim->y = Saken->y;
             enemy_aim->x = Saken->x;
             fprintf(stderr, "before fill enemy map\n");
-            final_enemy_map(map, Saken, h, w, enemy_aim, &enemy_min_tick); 
+            final_enemy_map(map, Saken, h, w, enemy_aim, &enemy_min_tick);
         }
         int dir = 5;
 
@@ -472,7 +472,7 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
             break;
         }
     }
-    
+
     if (*dir != 4 && *dir != 5 && map[aim->y][aim->x].box < 0)
     {
         fprintf(stderr, "escape?\n");
@@ -554,7 +554,7 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
                     return 1;
                 }
             }*/
-            
+
         }
         free(tmp_aim);
     }
@@ -699,7 +699,7 @@ void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_
         less_than = 5 - Deidara->f_r;
     else
         less_than = 5 - Saken->f_r;
-    
+
     if (player_id == p_id && Deidara->f_a == 0)
     {
         if (*min_tick == 0 || *min_tick > param_1)
@@ -806,7 +806,7 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w)
     }
 }
 
-void fill_enemy_goal(struct cell** map, struct bot* Saken, int h , int w)
+void fill_enemy_goal(struct cell** map, struct bot* Saken, int h, int w)
 {
     for (int i = 0; i < h; i++)
     {
@@ -1009,23 +1009,23 @@ void fill_tunnel(struct cell** map, struct bot* Saken, int h, int w)
         {
             if (map[y][x].tunnel == -1)
             {
-                if (y - 1 >= 0) 
+                if (y - 1 >= 0)
                     if (map[y - 1][x].path != 1000)
                     {
                         get_tunnels(map, Saken, y - 1, x, 1, h, w);
                     }
                 if (y + 1 < h)
-                    if (map[y+1][x].path != 1000) 
+                    if (map[y + 1][x].path != 1000)
                     {
                         get_tunnels(map, Saken, y + 1, x, 1, h, w);
                     }
-                if (x - 1 >= 0) 
-                    if (map[y][x-1].path != 1000) 
+                if (x - 1 >= 0)
+                    if (map[y][x - 1].path != 1000)
                     {
                         get_tunnels(map, Saken, y, x - 1, 1, h, w);
                     }
-                if (x + 1 < w) 
-                    if (map[y][x+1].path != 1000) 
+                if (x + 1 < w)
+                    if (map[y][x + 1].path != 1000)
                     {
                         get_tunnels(map, Saken, y, x + 1, 1, h, w);
                     }
@@ -1038,32 +1038,32 @@ void get_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, i
 {
     int box_count = 0;
     if (y - 1 < 0) box_count++;
-    else if (map[y-1][x].box > 1) box_count++;
+    else if (map[y - 1][x].box > 1) box_count++;
     if (y + 1 >= h) box_count++;
-    else if (map[y+1][x].box > 1) box_count++;
+    else if (map[y + 1][x].box > 1) box_count++;
     if (x - 1 < 0) box_count++;
-    else if (map[y][x-1].box > 1) box_count++;
+    else if (map[y][x - 1].box > 1) box_count++;
     if (x + 1 >= w) box_count++;
-    else if (map[y][x+1].box > 1) box_count++;
+    else if (map[y][x + 1].box > 1) box_count++;
     if (box_count == 2)
     {
         map[y][x].tunnel = deep + 1;
         if (map[y][x].tunnel <= Saken->f_r + 1) map[y][x].tunnel *= -1;
         if (y - 1 >= 0)
         {
-            if (map[y-1][x].path != 1000 && (map[y-1][x].tunnel == 0 || map[y-1][x].tunnel > 100)) get_tunnels(map, Saken, y - 1, x, deep + 1, h, w);
+            if (map[y - 1][x].path != 1000 && (map[y - 1][x].tunnel == 0 || map[y - 1][x].tunnel > 100)) get_tunnels(map, Saken, y - 1, x, deep + 1, h, w);
         }
         if (y + 1 < h)
         {
-            if (map[y+1][x].path != 1000 && (map[y+1][x].tunnel == 0 || map[y+1][x].tunnel > 100)) get_tunnels(map, Saken, y + 1, x, deep + 1, h, w);
+            if (map[y + 1][x].path != 1000 && (map[y + 1][x].tunnel == 0 || map[y + 1][x].tunnel > 100)) get_tunnels(map, Saken, y + 1, x, deep + 1, h, w);
         }
         if (x - 1 >= 0)
         {
-            if (map[y][x-1].path != 1000 && (map[y][x-1].tunnel == 0 || map[y][x-1].tunnel > 100)) get_tunnels(map, Saken, y, x - 1, deep + 1, h, w);
+            if (map[y][x - 1].path != 1000 && (map[y][x - 1].tunnel == 0 || map[y][x - 1].tunnel > 100)) get_tunnels(map, Saken, y, x - 1, deep + 1, h, w);
         }
         if (x + 1 < w)
         {
-            if (map[y][x+1].path != 1000 && (map[y][x+1].tunnel == 0 || map[y][x+1].tunnel > 100)) get_tunnels(map, Saken, y, x + 1, deep + 1, h, w);
+            if (map[y][x + 1].path != 1000 && (map[y][x + 1].tunnel == 0 || map[y][x + 1].tunnel > 100)) get_tunnels(map, Saken, y, x + 1, deep + 1, h, w);
         }
     }
     else
