@@ -208,10 +208,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
         {
             if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -224,10 +224,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
         {
             if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -240,10 +240,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
         {
             if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -256,10 +256,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
         {
             if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -418,7 +418,7 @@ int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_
             find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
         }
     }
-    return 0;
+    return 1;
 }
 
 void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
@@ -1060,10 +1060,10 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         {
             if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -1076,10 +1076,10 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         {
             if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -1092,10 +1092,10 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         {
             if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
@@ -1108,10 +1108,10 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         {
             if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay)
             {
+                next.y = y;
+                next.x = x;
                 if (map[y][x].delay != 0)
                 {
-                    next.y = y;
-                    next.x = x;
                     wait = map[y][x].delay;
                     escape = 1;
                 }
