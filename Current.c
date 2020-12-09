@@ -285,13 +285,13 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
     
     if (*dir != 4 && *dir != 5 && map[aim->y][aim->x].box < 0)
     {
-        printf(stderr, "escape?\n");
-        printf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
+        fprintf(stderr, "escape?\n");
+        fprintf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
         if (map[Deidara->y][Deidara->x].box < 0 && (map[next.y][next.x].box == -1 || map[next.y][next.x].box == -2))
         {
-            printf(stderr, "escape initiated.\n");
+            fprintf(stderr, "escape initiated.\n");
             get_out(map, Deidara, dir, h, w);
-            printf(stderr, "new dir is %d\n", *dir);
+            fprintf(stderr, "new dir is %d\n", *dir);
         }
         else if (map[next.y][next.x].box < 0)
             *dir = 5;
@@ -299,13 +299,13 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
 
     if (escape != 0)
     {
-        printf(stderr, "escape?\n");
-        printf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
+        fprintf(stderr, "escape?\n");
+        fprintf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
         if (map[Deidara->y][Deidara->x].box < 0 && (map[next.y][next.x].box == -1 || map[next.y][next.x].box == -2))
         {
-            printf(stderr, "escape initiated.\n");
+            fprintf(stderr, "escape initiated.\n");
             get_out(map, Deidara, dir, h, w);
-            printf(stderr, "new dir is %d\n", *dir);
+            fprintf(stderr, "new dir is %d\n", *dir);
         }
         else if (wait != 0 && wait == -map[next.y][next.x].box)
             *dir = 5;
@@ -321,10 +321,9 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
         int anti_timeout = 1;
         tmp_aim->y = -1;
         tmp_aim->x = -1;
-        find_trap_pos(map, tmp_aim, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Saken->f_r + 1, h, w, &anti_timeout);
-        if (anti_timeout == 100)
+        if (find_trap_pos(map, tmp_aim, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Saken->f_r + 1, h, w, &anti_timeout) == 0)
         {
-            fprintf(stderr, "anti_timeout or some error find_trap_pos");
+            fprintf(stderr, "error in find_trap_pos");
             free(tmp_aim);
             return 0;
         }
@@ -419,6 +418,7 @@ int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_
             find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
         }
     }
+    return 0;
 }
 
 void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
@@ -1149,13 +1149,13 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
 
     if (*dir != 4 && *dir != 5 && map[aim->y][aim->x].box < 0)
     {
-        printf(stderr, "escape?\n");
-        printf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
+        fprintf(stderr, "escape?\n");
+        fprintf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
         if (map[Deidara->y][Deidara->x].box < 0 && (map[next.y][next.x].box == -1 || map[next.y][next.x].box == -2))
         {
-            printf(stderr, "escape initiated.\n");
+            fprintf(stderr, "escape initiated.\n");
             get_out(map, Deidara, dir, h, w);
-            printf(stderr, "new dir is %d\n", *dir);
+            fprintf(stderr, "new dir is %d\n", *dir);
         }
         else if (map[next.y][next.x].box < 0)
             *dir = 5;
@@ -1163,13 +1163,13 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
 
     if (escape != 0)
     {
-        printf(stderr, "escape?\n");
-        printf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
+        fprintf(stderr, "escape?\n");
+        fprintf(stderr, "wait %d dir %d next %d %d %d\n", wait, *dir, next.y, next.x, map[next.y][next.x].box);
         if (map[Deidara->y][Deidara->x].box < 0 && (map[next.y][next.x].box == -1 || map[next.y][next.x].box == -2))
         {
-            printf(stderr, "escape initiated.\n");
+            fprintf(stderr, "escape initiated.\n");
             get_out(map, Deidara, dir, h, w);
-            printf(stderr, "new dir is %d\n", *dir);
+            fprintf(stderr, "new dir is %d\n", *dir);
         }
         else if (wait != 0 && wait == -map[next.y][next.x].box)
             *dir = 5;
@@ -1190,7 +1190,7 @@ void get_out(struct cell** map, struct bot* Deidara, int* dir, int h, int w)
     }
     if (x + 1 < w)
     {
-        if (map[y][x + 1].box == 1 || map[y][x - 1].box < -1)
+        if (map[y][x + 1].box == 1 || map[y][x + 1].box < -1)
         {
             *dir = 1;
             return;
@@ -1198,17 +1198,17 @@ void get_out(struct cell** map, struct bot* Deidara, int* dir, int h, int w)
     }
     if (y - 1 >= 0)
     {
-        if (map[y - 1][x].box == 1 || map[y][x - 1].box < -1)
+        if (map[y - 1][x].box == 1 || map[y - 1][x].box < -1)
         {
-            *dir = 3;
+            *dir = 2;
             return;
         }
     }
     if (y + 1 < h)
     {
-        if (map[y + 1][x].box == 1 || map[y][x - 1].box < -1)
+        if (map[y + 1][x].box == 1 || map[y + 1][x].box < -1)
         {
-            *dir = 2;
+            *dir = 3;
             return;
         }
     }
