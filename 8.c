@@ -6,7 +6,7 @@
 
 struct cell
 {
-    int box, path, goal, delay, tunnel, enemy_delay, enemy_path, enemy_goal, bloodpath;
+    int box, path, goal, delay, tunnel, enemy_tunnel, enemy_delay, enemy_path, enemy_goal, bloodpath;
 };
 
 struct bot
@@ -19,10 +19,15 @@ struct pos
     int x, y;
 };
 
+struct situation
+{
+    int assassin, trapped, block;
+};
+
 void fill_map(struct cell** map, char* line, int i, int j, int* box_number);
-void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick, int* enemy_min_tick);
+void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick);
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef);
-void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick, int* enemy_min_tick);
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
 int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
 void fill_path(struct cell** map, struct bot* Deidara, int h, int w);
 void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb);
@@ -34,20 +39,21 @@ void fill_tunnel(struct cell** map, struct bot* Saken, int h, int w);
 void get_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, int h, int w);
 void fill_goal(struct cell** map, struct bot* Deidara, int h, int w);
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w);
-int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int assassin);
+int kill_bot(struct cell** map, struct bot* Deidara, struct bot* Saken, struct situation* status, struct pos* kill_aim, struct pos* enemy_aim, int h, int w);
 int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int* anti_timeout);
 void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int* min_tick);
-void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir, int assassin, int block);
-int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir, int* trapped);
+void find_dir(struct cell** map, struct bot* Deidara, struct situation* status, struct pos* aim, int h, int w, int* dir);
+int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct situation* status, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
 void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim);
 void fill_enemy_box(struct cell** map, struct bot* Saken, int y, int x, int h, int w);
 void fill_enemy_goal(struct cell** map, struct bot* Saken, int h, int w);
 void fill_enemy_path(struct cell** map, struct bot* Saken, int h, int w);
 void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h, int w, int bomb);
-void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int* min_tick);
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim);
 int my_abs_dif(int n1, int n2);
 int my_abs(int n);
 void get_out(struct cell** map, struct bot* Deidara, int* dir, int h, int w);
+void print_map(struct cell** map, int h, int w, int map_index);
 
 int main(void)
 {
@@ -57,16 +63,20 @@ int main(void)
     struct bot* Saken = malloc(sizeof(struct bot));
     Saken->f_r = 2;
     Saken->a_a = 1;
+    Saken->x = -1;
     int box_number = 0;
-    int assassin = 1;
-    int trapped = 0;
+    struct situation* status = malloc(sizeof(struct situation));
+    status->assassin = 1;
+    status->trapped = 0;
     while (1)
     {
         int h, w, player_id, tick;
         scanf("%d%d%d%d", &w, &h, &player_id, &tick);
         fprintf(stderr, "h - %d, w - %d, player_id - %d, tick - %d\n", h, w, player_id, tick);
 
-        // read map
+        /*
+        Read map
+        */
         struct cell** map = malloc(sizeof(struct cell*) * h);
         int current_number = 0;
         for (int i = 0; i < h; i++)
@@ -84,16 +94,19 @@ int main(void)
             free(line);
         }
 
-        // number of entities
+        /*
+        Number of entities
+        */
         int n;
         scanf("%d", &n);
         getchar();
-        fprintf(stderr, "number of entities - %d\n", n);
-        Saken->x = -1;
+        fprintf(stderr, "Number of entities - %d\n", n);
         int coef = (current_number * 100 / box_number) + 10;
         int min_tick = 0;
-        int enemy_min_tick = 0;
-        // read entities
+
+        /*
+        Read entities
+        */
         for (int i = 0; i < 2 * (n - 1) + 1; i++)
         {
             char ent_type;
@@ -107,100 +120,171 @@ int main(void)
                     ent_type = 'l';
             }
             scanf("%d%d%d%d%d", &p_id, &x, &y, &param_1, &param_2);
-            fill_entity(map, Deidara, Saken, ent_type, p_id, x, y, param_1, param_2, player_id, h, w, coef, &min_tick, &enemy_min_tick);
+            fill_entity(map, Deidara, Saken, ent_type, p_id, x, y, param_1, param_2, player_id, h, w, coef, &min_tick);
+        }
+        fprintf(stderr, "After fill_entity\n");
+        print_map(map, h, w, 0);
+
+        /*
+        Read features
+        */
+        int f_n = 0;
+        scanf("%d", &f_n);
+        fprintf(stderr, "Number of features - %d\n", f_n);
+        getchar();
+        for (int i = 0; i < f_n; i++) {
+            int p_id, type;
+            scanf("%d%d", &p_id, &type);
+            fprintf(stderr, "Player id is %d Type is %d\n", p_id, type);
         }
 
-        fprintf(stderr, "before fill goal\n");
+        /*
+        Fill goal
+        */
+        fprintf(stderr, "Before fill_goal\n");
         fill_goal(map, Deidara, h, w);
+        fprintf(stderr, "After fill_goal\n");
+        print_map(map, h, w, 4);
+
+        /*
+        fill_enemy_goal
+        */
         if (Saken->x != -1)
         {
-            fprintf(stderr, "before fill enemy goal\n");
+            fprintf(stderr, "Before fill enemy goal\n");
             fill_enemy_goal(map, Saken, h, w);
-        }
-        fprintf(stderr, "before fill_path\n");
-        fill_path(map, Deidara, h, w);
-        if (Saken->x != -1)
-        {
-            fprintf(stderr, "before fill tunnel\n");
-            fill_tunnel(map, Saken, h, w);
-            fprintf(stderr, "before fill enemy path\n");
-            fill_enemy_path(map, Saken, h, w);
+            fprintf(stderr, "After fill enemy goal\n");
+            print_map(map, h, w, 5);
         }
 
+        /*
+        Fill path
+        */
+        fprintf(stderr, "Before fill path\n");
+        fill_path(map, Deidara, h, w);
+        fprintf(stderr, "After fill path\n");
+        print_map(map, h, w, 2);
+
+        /*
+        Fill tunnel
+            and
+        Fill enemy path
+        */
+        if (Saken->x != -1)
+        {
+            fprintf(stderr, "Before fill enemy path\n");
+            fill_enemy_path(map, Saken, h, w);
+            fprintf(stderr, "After fill enemy path\n");
+            print_map(map, h, w, 6);
+            fprintf(stderr, "Before fill tunnel\n");
+            fill_tunnel(map, Saken, h, w);
+            fprintf(stderr, "After fill tunnel\n");
+            print_map(map, h, w, 1);
+        }
+
+        /*
+        Final enemy map
+        */
         struct pos* enemy_aim = malloc(sizeof(struct pos));
         struct pos* kill_aim = malloc(sizeof(struct pos));
-        int kill_command = 0;
-
         if (Saken->x != -1)
         {
             enemy_aim->y = Saken->y;
             enemy_aim->x = Saken->x;
-            fprintf(stderr, "before fill enemy map\n");
-            final_enemy_map(map, Saken, h, w, enemy_aim, &enemy_min_tick);
+            fprintf(stderr, "Before fill final enemy map\n");
+            final_enemy_map(map, Saken, h, w, enemy_aim);
+            fprintf(stderr, "After fill final enemy map\n");
+            print_map(map, h, w, 7);
         }
-        int dir = 5;
 
-        int block = 0;
+        /*
+        Fill bloodpath
+        */
+        int dir = 5;
+        status->block = 0;
         if (Saken->x == -1)
         {
-            assassin = 0;
+            status->assassin = 0;
         }
-
-        if (assassin == 1 && map[enemy_aim->y][enemy_aim->x].path == 1000)
+        if (status->assassin == 1 && map[enemy_aim->y][enemy_aim->x].path == 1000)
         {
-            block = 1;
+            status->block = 1;
+            fprintf(stderr, "Before fill bloodpath\n");
             fill_bloodpath(map, Deidara, h, w);
+            fprintf(stderr, "After fill bloodpath\n");
+            print_map(map, h, w, 3);
         }
 
-        if (block == 1)
+        /*
+        Find block box
+        */
+        if (status->block == 1)
         {
             find_unblock_aim(map, Deidara, Saken, h, w);
         }
 
+        /*
+        Fill final goal
+        */
         struct pos* aim = malloc(sizeof(struct pos));
         aim->y = Deidara->y;
         aim->x = Deidara->x;
-
-        if (assassin == 1 && trapped == 0)
+        if (status->assassin == 1 && status->trapped == 0)
         {
             map[Saken->y][Saken->x].goal = 500;
         }
-
         fprintf(stderr, "Min tick %d\n", min_tick);
+        fprintf(stderr, "Before final map\n");
         final_map(map, Deidara, h, w, aim, &min_tick);
+        fprintf(stderr, "After final map\n");
+        print_map(map, h, w, 8);
 
+        fprintf(stderr, "Enemy_aim values %d %d %d\n", enemy_aim->y, enemy_aim->x, map[enemy_aim->y][enemy_aim->x].tunnel);
+        /*
+        Kill bot
+        */
+        int kill_command = 0;
         if (Saken->x != -1)
         {
-            fprintf(stderr, "before kill_bot\n");
-            kill_command = kill_bot(map, Saken, kill_aim, enemy_aim, h, w, assassin);
+            fprintf(stderr, "Before kill_bot\n");
+            kill_command = kill_bot(map, Deidara, Saken, status, kill_aim, enemy_aim, h, w);
+            fprintf(stderr, "After kill_bot\n");
         }
 
+        /*
+        Fill the direction
+        */
         if (kill_command == 0)
         {
             fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
-            find_dir(map, Deidara, aim, h, w, &dir, assassin, block);
+            find_dir(map, Deidara, status, aim, h, w, &dir);
         }
         else
         {
             fprintf(stderr, "Final aim to kill is %d %d %d Enemy %d %d\n", map[aim->y][aim->x].goal, kill_aim->y, kill_aim->x, enemy_aim->y, enemy_aim->x);
-            int failure = target_acqured(map, Deidara, Saken, kill_aim, enemy_aim, h, w, &dir, &trapped);
+            int failure = target_acqured(map, Deidara, Saken, status, kill_aim, enemy_aim, h, w, &dir);
             if (failure == 1)
             {
                 fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
-                find_dir(map, Deidara, aim, h, w, &dir, assassin, block);
+                find_dir(map, Deidara, status, aim, h, w, &dir);
             }
         }
 
+        /*
+        Bot actions
+        */
         const char actions[][10] = { "left", "right", "up", "down", "bomb", "stay" };
-
-        // bot action
         printf("%s\n", actions[dir]);
         fflush(stdout);
 
+        /*
+        Free
+        */
         freentf(map, h, w, aim, enemy_aim, kill_aim);
     }
     free(Saken);
     free(Deidara);
+    free(status);
     return 0;
 }
 
@@ -364,7 +448,7 @@ void get_bloodpoint(struct cell** map, int y, int x, int step, int prev, int h, 
         get_bloodpoint(map, y - 1, x, step, 'U', h, w, bomb);
 }
 
-int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir, int* trapped)
+int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct situation* status, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir)
 {
     int anti_timeout = 0;
     int y = aim->y;
@@ -380,10 +464,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
 
     if (Deidara->y == aim->y && Deidara->x == aim->x)
     {
-        if (Saken->y == enemy_aim->y && Saken->x == enemy_aim->x)
+        if (map[Saken->y][Saken->x].tunnel < 0 && my_abs(map[aim->y][aim->x].tunnel) > my_abs(map[Saken->y][Saken->x].tunnel))
         {
             *dir = 4;
-            *trapped = 0;
+            status->trapped = 1;
         }
         else
         {
@@ -503,7 +587,7 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
     return 0;
 }
 
-int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int assassin)
+int kill_bot(struct cell** map, struct bot* Deidara, struct bot* Saken, struct situation* status, struct pos* kill_aim, struct pos* enemy_aim, int h, int w)
 {
     if (map[enemy_aim->y][enemy_aim->x].tunnel < 0)
     {
@@ -511,50 +595,71 @@ int kill_bot(struct cell** map, struct bot* Saken, struct pos* aim, struct pos* 
         int anti_timeout = 1;
         tmp_aim->y = -1;
         tmp_aim->x = -1;
+        fprintf(stderr, "Kill bot: Before find trap pos\n");
         if (find_trap_pos(map, tmp_aim, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Saken->f_r + 1, h, w, &anti_timeout) == 0)
         {
             fprintf(stderr, "error in find_trap_pos\n");
             free(tmp_aim);
             return 0;
         }
+        fprintf(stderr, "Kill bot: After find trap pos\n");
         if (map[tmp_aim->y][tmp_aim->x].path <= map[enemy_aim->y][enemy_aim->x].enemy_path)
         {
-            fprintf(stderr, "Found a case to kill and we have extra %d steps.\n", map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path);
+            int extra_steps = map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path;
+            if (extra_steps > 0)
+            {
+                int anti_timeout_2 = 1;
+                struct pos* tmp_aim2 = malloc(sizeof(struct pos));
+                if (find_trap_pos(map, tmp_aim2, enemy_aim->y, enemy_aim->x, my_abs(map[enemy_aim->y][enemy_aim->x].tunnel) + Deidara->f_r, h, w, &anti_timeout_2) == 0)
+                {
+                    fprintf(stderr, "error in find_trap_pos after extra steps\n");
+                    free(tmp_aim);
+                    return 0;
+                }
+                if (map[tmp_aim2->y][tmp_aim2->x].path <= map[enemy_aim->y][enemy_aim->x].enemy_path)
+                {
+                    tmp_aim->y = tmp_aim2->y;
+                    tmp_aim->x = tmp_aim2->x;
+                    fprintf(stderr, "Found a case to kill for probably 7 points and we have extra %d steps.\n", extra_steps);
+                }
+                free(tmp_aim2);
+            }
+            else
+                fprintf(stderr, "Found a case to trap and we have extra %d steps.\n", extra_steps);
 
             int extra = 1;
-            if (assassin == 1)
+            if (status->assassin == 1)
             {
                 extra = 50;
             }
 
-            if (aim->y == enemy_aim->y && aim->x == enemy_aim->x)
+            if (kill_aim->y == enemy_aim->y && kill_aim->x == enemy_aim->x)
             {
                 fprintf(stderr, "First if in kill bot\n");
-                aim->y = tmp_aim->y;
-                aim->x = tmp_aim->x;
+                kill_aim->y = tmp_aim->y;
+                kill_aim->x = tmp_aim->x;
                 free(tmp_aim);
                 return 1;
             }
             else if (map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path <= extra)
             {
                 fprintf(stderr, "Else if in kill bot 1\n");
-                aim->y = tmp_aim->y;
-                aim->x = tmp_aim->x;
+                kill_aim->y = tmp_aim->y;
+                kill_aim->x = tmp_aim->x;
                 free(tmp_aim);
                 return 1;
-            }/*
+            }
             else if (map[enemy_aim->y][enemy_aim->x].enemy_path - map[tmp_aim->y][tmp_aim->x].path == -1)
             {
                 fprintf(stderr, "Else if in kill bot 2\n");
                 if (my_abs(enemy_aim->y - tmp_aim->y) + my_abs(enemy_aim->x - tmp_aim->x) > 1)
                 {
-                    aim->y = tmp_aim->y;
-                    aim->x = tmp_aim->x;
+                    kill_aim->y = tmp_aim->y;
+                    kill_aim->x = tmp_aim->x;
                     free(tmp_aim);
                     return 1;
                 }
-            }*/
-
+            }
         }
         free(tmp_aim);
     }
@@ -650,7 +755,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number)
     map[i][j].bloodpath = 1000;
 }
 
-void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick, int* enemy_min_tick)
+void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick)
 {
     switch (ent_type)
     {
@@ -674,7 +779,7 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
         break;
 
     case 'b':
-        fill_bomb(map, Deidara, Saken, p_id, x, y, param_1, param_2, h, w, player_id, min_tick, enemy_min_tick);
+        fill_bomb(map, Deidara, Saken, p_id, x, y, param_1, param_2, h, w, player_id, min_tick);
         fprintf(stderr, "bomb: x - %d, y - %d, tick - %d, radius - %d\n", x, y, param_1, param_2);
         break;
 
@@ -692,7 +797,7 @@ void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char
     }
 }
 
-void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick, int* enemy_min_tick)
+void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick)
 {
     int less_than = 0;
     if (player_id == p_id)
@@ -704,11 +809,6 @@ void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_
     {
         if (*min_tick == 0 || *min_tick > param_1)
             *min_tick = param_1;
-    }
-    if (player_id != p_id && Saken->f_a == 0)
-    {
-        if (*enemy_min_tick == 0 || *enemy_min_tick > param_1)
-            *enemy_min_tick = param_1;
     }
 
     if (param_1 >= less_than)
@@ -1038,13 +1138,13 @@ void get_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, i
 {
     int box_count = 0;
     if (y - 1 < 0) box_count++;
-    else if (map[y - 1][x].box > 1) box_count++;
+    else if (map[y - 1][x].box > 1 && map[y - 1][x].box != 50) box_count++;
     if (y + 1 >= h) box_count++;
-    else if (map[y + 1][x].box > 1) box_count++;
+    else if (map[y + 1][x].box > 1 && map[y + 1][x].box != 50) box_count++;
     if (x - 1 < 0) box_count++;
-    else if (map[y][x - 1].box > 1) box_count++;
+    else if (map[y][x - 1].box > 1 && map[y][x - 1].box != 50) box_count++;
     if (x + 1 >= w) box_count++;
-    else if (map[y][x + 1].box > 1) box_count++;
+    else if (map[y][x + 1].box > 1 && map[y][x + 1].box != 50) box_count++;
     if (box_count == 2)
     {
         map[y][x].tunnel = deep + 1;
@@ -1175,15 +1275,10 @@ void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos*
     }
 }
 
-void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim, int* min_tick)
+void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim)
 {
     if (map[Saken->y][Saken->x].enemy_goal == 0)
         map[Saken->y][Saken->x].enemy_goal = -135;
-
-    if (Saken->f_a != 0 && *min_tick != 0)
-    {
-        *min_tick = 0;
-    }
 
     for (int i = 0; i < h; i++)
     {
@@ -1191,13 +1286,7 @@ void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct 
         {
             if (map[i][j].enemy_goal == 0)
                 map[i][j].enemy_goal = -135;
-            if (*min_tick != 0)
-            {
-                if (*min_tick <= map[i][j].enemy_path)
-                    map[i][j].enemy_goal -= (map[i][j].enemy_path - *min_tick);
-            }
-            else
-                map[i][j].enemy_goal -= map[i][j].enemy_path; //+ up to tick or path
+            map[i][j].enemy_goal -= map[i][j].enemy_path;
             if (map[i][j].enemy_goal > map[enemy_aim->y][enemy_aim->x].enemy_goal)
             {
                 enemy_aim->y = i;
@@ -1221,7 +1310,7 @@ void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct 
     }
 }
 
-void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir, int assassin, int block)
+void find_dir(struct cell** map, struct bot* Deidara, struct situation* status, struct pos* aim, int h, int w, int* dir)
 {
     int anti_timeout = 0;
     int y = aim->y;
@@ -1229,25 +1318,25 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
     int wait = 0;
     struct pos next = { -1, -1 };
     int escape = 0;
-    if (y == Deidara->y && x == Deidara->x && (block == 1 || assassin == 0))
+    if (y == Deidara->y && x == Deidara->x && (status->block == 1 || status->assassin == 0))
     {
         fprintf(stderr, "Bomb plant case 1 %d %d \n", y, x);
         *dir = 4;
         return;
     }
-    else if ((map[aim->y][aim->x].path >= 5 && map[aim->y][aim->x].path > Deidara->f_r) && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 0 && assassin == 0)
+    else if ((map[aim->y][aim->x].path >= 5 && map[aim->y][aim->x].path > Deidara->f_r) && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 0 && status->assassin == 0)
     {
         fprintf(stderr, "Bomb plant case 2 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
         *dir = 4;
         return;
     }
-    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2 && assassin == 0)
+    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2 && status->assassin == 0)
     {
         fprintf(stderr, "Bomb plant case 3 %d %d %d\n", aim->y, aim->x, Deidara->f_r);
         *dir = 4;
         return;
     }
-    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 1 && assassin == 0)
+    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 1 && status->assassin == 0)
     {
         fprintf(stderr, "Bomb plant case 4 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
         *dir = 4;
@@ -1415,80 +1504,134 @@ void get_out(struct cell** map, struct bot* Deidara, int* dir, int h, int w)
 
 }
 
+void print_map(struct cell** map, int h, int w, int map_index)
+{
+    switch (map_index)
+    {
+    case 0:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "box: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%4d ", map[i][j].box);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 1:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "tunnel: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%4d ", map[i][j].tunnel);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 2:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "path: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%4d ", map[i][j].path);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 3:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "bloodpath: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%4d ", map[i][j].bloodpath);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 4:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "goal: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%5d ", map[i][j].goal);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 5:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "enemy goal: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%5d ", map[i][j].enemy_goal);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 6:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "enemy_path: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%5d ", map[i][j].enemy_path);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 7:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "Final enemy goal: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%5d ", map[i][j].enemy_goal);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    case 8:
+        fprintf(stderr, "\n");
+        for (int i = 0; i < h; i++)
+        {
+            fprintf(stderr, "Final goal: ");
+            for (int j = 0; j < w; j++)
+            {
+                fprintf(stderr, "%5d ", map[i][j].goal);
+            }
+            fprintf(stderr, "\n");
+        }
+        fprintf(stderr, "\n");
+        break;
+    default:
+        break;
+    }
+}
+
 void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim)
 {
-    // print maps
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "box: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%4d ", map[i][j].box);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "tunnel: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%4d ", map[i][j].tunnel);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "path: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%4d ", map[i][j].path);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "bloodpath: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%4d ", map[i][j].bloodpath);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "goal: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%5d ", map[i][j].goal);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "enemy_path: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%5d ", map[i][j].enemy_path);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
-    for (int i = 0; i < h; i++)
-    {
-        fprintf(stderr, "enemy_goal: ");
-        for (int j = 0; j < w; j++)
-        {
-            fprintf(stderr, "%5d ", map[i][j].enemy_goal);
-        }
-        fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "\n");
     //free part
     for (int i = 0; i < w; i++)
     {
