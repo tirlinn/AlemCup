@@ -66,7 +66,7 @@ int main(void)
     Saken->x = -1;
     int box_number = 0;
     struct situation* status = malloc(sizeof(struct situation));
-    status->assassin = 1;
+    status->assassin = 0;
     status->trapped = 0;
     while (1)
     {
