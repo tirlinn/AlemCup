@@ -39,7 +39,7 @@ void fill_goal(struct cell** map, struct bot* Deidara, int h, int w, struct situ
 void fill_box(struct cell** map, struct bot* Deidara, int y, int x, int h, int w, struct situation* status);
 int kill_bot(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* kill_aim, struct pos* enemy_aim, int h, int w);
 int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int* anti_timeout);
-void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int* min_tick);
+void final_map(struct cell** map, struct bot* Deidara, struct bot* Saken, int h, int w, struct pos* aim, struct pos* enemy_aim, int* min_tick);
 void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
 void freentf(struct cell** map, int h, int w, struct pos* aim, struct pos* enemy_aim, struct pos* kill_aim, int* sector_count);
@@ -56,6 +56,9 @@ void fill_enemy_tunnel(struct cell** map, struct bot* Saken, int h, int w);
 void get_enemy_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, int h, int w);
 void read_features(struct cell** map, struct bot* Deidara, struct bot* Saken, int player_id, int p_id, int type);
 void quadrant_priority(struct cell** map, struct situation* status, int i, int j, int h, int w);
+void get_features(struct cell** map, int y, int x, int step, int prev, int h, int w, int features);
+void fill_features(struct cell** map, struct bot* Deidara, int h, int w);
+void less_prio_if_too_late(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_aim);
 
 int main(void)
 {
@@ -201,6 +204,14 @@ int main(void)
         fill_path(map, Deidara, h, w);
         fprintf(stderr, "After fill path\n");
         print_map(map, h, w, 2);
+
+        /*
+        Fill_features
+        */
+        fprintf(stderr, "Before fill features\n");
+        fill_features(map, Deidara, h, w);
+        fprintf(stderr, "After fill features\n");
+        print_map(map, h, w, 9);
         
         /*
         Fill tunnel
@@ -238,6 +249,7 @@ int main(void)
             final_enemy_map(map, Saken, h, w, enemy_aim);
             fprintf(stderr, "After fill final enemy map\n");
             print_map(map, h, w, 7);
+            less_prio_if_too_late(map, Deidara, Saken, enemy_aim);
         }
 
 
@@ -250,7 +262,7 @@ int main(void)
         aim->x = Deidara->x;
         fprintf(stderr, "Min tick %d\n", min_tick);
         fprintf(stderr, "Before final map\n");
-        final_map(map, Deidara, h, w, aim, &min_tick);
+        final_map(map, Deidara, Saken, h, w, aim, enemy_aim, &min_tick);
         fprintf(stderr, "After final map\n");
         print_map(map, h, w, 8);
 
@@ -348,6 +360,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number, stru
     map[i][j].enemy_goal = 0;
     map[i][j].tunnel = 0;
     map[i][j].enemy_tunnel = 0;
+    map[i][j].features = 0;
 }
 
 
@@ -485,6 +498,7 @@ int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than)
 
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef)
 {
+    map[y][x].features = -1;
     if (Deidara->f_a > Deidara->a_a)
         Deidara->a_a = Deidara->f_a;
     //fprintf(stderr, "COEFF and a_a %d %d \n", 8 * coef / 100, Deidara->a_a);
@@ -753,6 +767,7 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
             // fprintf(stderr, "Added %d %d.\n", y, x);
         }
     }
+
     //if (step >= 30) return;
     if (step == 0)
     {
@@ -792,6 +807,50 @@ void get_point(struct cell** map, int y, int x, int step, int prev, int h, int w
         get_point(map, y, x - 1, step, 'L', h, w, bomb);
     if (prev != 'D' && y - 1 >= 0)
         get_point(map, y - 1, x, step, 'U', h, w, bomb);
+}
+
+
+
+void fill_features(struct cell** map, struct bot* Deidara, int h, int w)
+{
+    int step = 0;
+    char prev = 0;
+    int x = Deidara->x;
+    int y = Deidara->y;
+    int features = 0;
+    get_features(map, y, x, step, prev, h, w, features);
+}
+
+void get_features(struct cell** map, int y, int x, int step, int prev, int h, int w, int features)
+{
+    if (step == 0)
+    {
+        step++;
+    }
+    else if (map[y][x].box <= 1 && step == map[y][x].path)
+    {
+        if (map[y][x].features < 0)
+        {
+            features -= map[y][x].features;
+            map[y][x].features = -features;
+        }
+        else if (features > map[y][x].features)
+        {
+            map[y][x].features = features;
+        }
+        step++;
+    }
+    else
+        return;
+
+    if (prev != 'L' && x + 1 < w)
+        get_features(map, y, x + 1, step, 'R', h, w, features);
+    if (prev != 'U' && y + 1 < h)
+        get_features(map, y + 1, x, step, 'D', h, w, features);
+    if (prev != 'R' && x - 1 >= 0)
+        get_features(map, y, x - 1, step, 'L', h, w, features);
+    if (prev != 'D' && y - 1 >= 0)
+        get_features(map, y - 1, x, step, 'U', h, w, features);
 }
 
 
@@ -1062,7 +1121,46 @@ void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct 
 
 
 
-void final_map(struct cell** map, struct bot* Deidara, int h, int w, struct pos* aim, int* min_tick)
+void less_prio_if_too_late(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_aim)
+{
+    for (int i = -Saken->f_r; i <= Saken->f_r; i++)
+    {
+        if (enemy_aim->y + i >= 0 && enemy_aim->y + i < 11 && map[enemy_aim->y + i][enemy_aim->x].box == 10)
+        {
+            for (int j = -Deidara->f_r; j <= Deidara->f_r; j++)
+            {
+                if (enemy_aim->y + i + j >= 0 && enemy_aim->y + i + j < 11 && map[enemy_aim->y + i + j][enemy_aim->x].path > map[enemy_aim->y][enemy_aim->x].enemy_path)
+                {
+                    map[enemy_aim->y + i + j][enemy_aim->x].goal -= value;
+                }
+                if (enemy_aim->x + j >= 0 && enemy_aim->x + j < 13 && map[enemy_aim->y + i][enemy_aim->x + j].path > map[enemy_aim->y][enemy_aim->x].enemy_path)
+                {
+                    map[enemy_aim->y + i][enemy_aim->x + j].goal -= value;
+                }
+            }
+            break;
+        }
+        if (enemy_aim->x + i >= 0 && enemy_aim->x + i < 13 && map[enemy_aim->y][enemy_aim->x + i].box == 10)
+        {
+            for (int j = -Deidara->f_r; j <= Deidara->f_r; j++)
+            {
+                if (enemy_aim->y + j >= 0 && enemy_aim->y + j < 11 && map[enemy_aim->y + j][enemy_aim->x + i].path > map[enemy_aim->y][enemy_aim->x].enemy_path)
+                {
+                    map[enemy_aim->y + j][enemy_aim->x + i].goal -= value;
+                }
+                if (enemy_aim->x + i + j >= 0 && enemy_aim->x + i + j < 13 && map[enemy_aim->y][enemy_aim->x + i + j].path > map[enemy_aim->y][enemy_aim->x].enemy_path)
+                {
+                    map[enemy_aim->y][enemy_aim->x + i + j].goal -= value;
+                }
+            }
+            break;
+        }
+    }
+}
+
+
+
+void final_map(struct cell** map, struct bot* Deidara, struct bot* Saken, int h, int w, struct pos* aim, struct pos* enemy_aim, int* min_tick)
 {
     if (map[Deidara->y][Deidara->x].goal == 0)
         map[Deidara->y][Deidara->x].goal = -135;
@@ -1282,9 +1380,10 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
 
     while (y != Deidara->y || x != Deidara->x)
     {
+        int current_priority = 0;
         if (x - 1 >= 0)
         {
-            if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay && ((map[y][x - 1].features < 0 && map[y][x - 1].features < current_priority) || (current_priority >= 0 && map[y][x - 1].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1293,13 +1392,14 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
                     wait = map[y][x].delay;
                 }
                 *dir = 1;
+                current_priority = map[y][x - 1].features;
                 //x--;
                 //continue;
             }
         }
         if (y - 1 >= 0)
         {
-            if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay && ((map[y - 1][x].features < 0 && map[y - 1][x].features < current_priority) || (current_priority >= 0 && map[y - 1][x].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1308,13 +1408,14 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
                     wait = map[y][x].delay;
                 }
                 *dir = 3;
+                current_priority = map[y - 1][x].features;
                 //y--;
                 //continue;
             }
         }
         if (x + 1 < w)
         {
-            if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay && ((map[y][x + 1].features < 0 && map[y][x + 1].features < current_priority) || (current_priority >= 0 && map[y][x + 1].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1323,13 +1424,14 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
                     wait = map[y][x].delay;
                 }
                 *dir = 0;
+                current_priority = map[y][x + 1].features;
                 //x++;
                 //continue;
             }
         }
         if (y + 1 < h)
         {
-            if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay && ((map[y + 1][x].features < 0 && map[y + 1][x].features < current_priority) || (current_priority >= 0 && map[y + 1][x].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1338,6 +1440,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
                     wait = map[y][x].delay;
                 }
                 *dir = 2;
+                current_priority = map[y + 1][x].features;
                 //y++;
                 //continue;
             }
@@ -1420,9 +1523,10 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
 
     while (y != Deidara->y || x != Deidara->x)
     {
+        int current_priority = 0;
         if (x - 1 >= 0)
         {
-            if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y][x - 1].path == map[y][x].path - 1 - map[y][x].delay && ((map[y][x - 1].features < 0 && map[y][x - 1].features < current_priority) || (current_priority >= 0 && map[y][x - 1].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1431,13 +1535,14 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
                     wait = map[y][x].delay;
                 }
                 *dir = 1;
+                current_priority = map[y][x - 1].features;
                 //x--;
                 //continue;
             }
         }
         if (y - 1 >= 0)
         {
-            if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y - 1][x].path == map[y][x].path - 1 - map[y][x].delay && ((map[y - 1][x].features < 0 && map[y - 1][x].features < current_priority) || (current_priority >= 0 && map[y - 1][x].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1446,13 +1551,14 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
                     wait = map[y][x].delay;
                 }
                 *dir = 3;
+                current_priority = map[y - 1][x].features;
                 //y--;
                 //continue;
             }
         }
         if (x + 1 < w)
         {
-            if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y][x + 1].path == map[y][x].path - 1 - map[y][x].delay && ((map[y][x + 1].features < 0 && map[y][x + 1].features < current_priority) || (current_priority >= 0 && map[y][x + 1].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1461,13 +1567,14 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
                     wait = map[y][x].delay;
                 }
                 *dir = 0;
+                current_priority = map[y][x + 1].features;
                 //x++;
                 //continue;
             }
         }
         if (y + 1 < h)
         {
-            if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay)
+            if (map[y + 1][x].path == map[y][x].path - 1 - map[y][x].delay && ((map[y + 1][x].features < 0 && map[y + 1][x].features < current_priority) || (current_priority >= 0 && map[y + 1][x].features >= current_priority)))
             {
                 next.y = y;
                 next.x = x;
@@ -1476,6 +1583,7 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
                     wait = map[y][x].delay;
                 }
                 *dir = 2;
+                current_priority = map[y + 1][x].features;
                 //y++;
                 //continue;
             }
@@ -1673,6 +1781,19 @@ void print_map(struct cell** map, int h, int w, int map_index)
                 for (int j = 0; j < w; j++)
                 {
                     fprintf(stderr, "%5d ", map[i][j].goal);
+                }
+                fprintf(stderr, "\n");
+            }
+            fprintf(stderr, "\n");
+            break;
+        case 9:
+            fprintf(stderr, "\n");
+            for (int i = 0; i < h; i++)
+            {
+                fprintf(stderr, "Features: ");
+                for (int j = 0; j < w; j++)
+                {
+                    fprintf(stderr, "%5d ", map[i][j].features);
                 }
                 fprintf(stderr, "\n");
             }
