@@ -541,11 +541,14 @@ int fill_bomb_dir(struct cell** map, struct bot* Deidara, struct bot* Saken, int
             map[y][x].goal = -150;
         map[y][x].box = -1 * param_1;
     }
-    else if (map[y][x].box < -1 * param_1 && map[y][x].bomb_radius == 0)
+    else if (map[y][x].box < 0)
     {
-        if (param_1 >= less_than)
-            map[y][x].goal = -150;
-        map[y][x].box = -1 * param_1;
+        if(map[y][x].box < -1 * param_1 && map[y][x].bomb_radius == 0)
+        {
+            if (param_1 >= less_than)
+                map[y][x].goal = -150;
+            map[y][x].box = -1 * param_1;
+        }
     }
     else if (map[y][x].box == 10)
     {
@@ -582,6 +585,7 @@ int fill_bomb_dir(struct cell** map, struct bot* Deidara, struct bot* Saken, int
         {
             fill_bomb(map, Deidara, Saken, p_id, x, y, map[y][x].bomb_radius, param_1, h, w, player_id, min_tick);
         }
+        return 0;
     }
     else
     {
@@ -1191,7 +1195,10 @@ void anti_trap(struct cell** map, struct bot* Deidara, struct bot* Saken, int h,
             {
                 if (Deidara->f_j == 0 && Saken->f_t == 1)
                 {
-                    map[i][j].goal = 0;
+                    if (map[i][j].goal > 0)
+                    {
+                        map[i][j].goal = 0;
+                    }
                     continue;
                 }
                 int anti_timeout = 0;
@@ -1222,7 +1229,10 @@ void anti_trap(struct cell** map, struct bot* Deidara, struct bot* Saken, int h,
 
                 if (map[tmp_aim->y][tmp_aim->x].enemy_path < safe_path)
                 {
-                    map[i][j].goal = 0;
+                    if (map[i][j].goal > 0)
+                    {
+                        map[i][j].goal = 0;
+                    }
                 }
             }
         }
@@ -1674,30 +1684,6 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
     int x = aim->x;
     int wait = 0;
     struct pos next = { -1, -1 };
-    if (y == Deidara->y && x == Deidara->x)
-    {
-        fprintf(stderr, "Bomb plant case 1 %d %d \n", y, x);
-        *dir = 4;
-        return;
-    }
-    else if ((map[aim->y][aim->x].path >= 5 && map[aim->y][aim->x].path > Deidara->f_r) && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 0)
-    {
-        fprintf(stderr, "Bomb plant case 2 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
-        *dir = 4;
-        return;
-    }
-    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2)
-    {
-        fprintf(stderr, "Bomb plant case 3 %d %d %d\n", aim->y, aim->x, Deidara->f_r);
-        *dir = 4;
-        return;
-    }
-    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 1)
-    {
-        fprintf(stderr, "Bomb plant case 4 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
-        *dir = 4;
-        return;
-    }
 
     while (y != Deidara->y || x != Deidara->x)
     {
@@ -1812,17 +1798,44 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
                 }
             }
             fprintf(stderr, "new dir is %d\n", *dir);
+            return;
         }
         else if (map[Deidara->y][Deidara->x].box == -2 && map[next.y][next.x].box == -2)
         {
             fprintf(stderr, "escape second if\n");
             get_out(map, Deidara, dir, h, w, -2);
             fprintf(stderr, "new dir is %d\n", *dir);
+            return;
         }
         else if ((map[Deidara->y][Deidara->x].box >= 1 || map[Deidara->y][Deidara->x].box < -1) && wait == -1 * map[next.y][next.x].box)
         {
             *dir = 5;
         }
+    }
+
+    if (aim->y == Deidara->y && aim->x == Deidara->x)
+    {
+        fprintf(stderr, "Bomb plant case 1 %d %d \n", y, x);
+        *dir = 4;
+        return;
+    }
+    else if ((map[aim->y][aim->x].path >= 5 && map[aim->y][aim->x].path > Deidara->f_r) && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 0)
+    {
+        fprintf(stderr, "Bomb plant case 2 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
+        *dir = 4;
+        return;
+    }
+    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value * 2)
+    {
+        fprintf(stderr, "Bomb plant case 3 %d %d %d\n", aim->y, aim->x, Deidara->f_r);
+        *dir = 4;
+        return;
+    }
+    else if (map[aim->y][aim->x].path > Deidara->f_r && map[Deidara->y][Deidara->x].goal == value && Deidara->f_a > 1)
+    {
+        fprintf(stderr, "Bomb plant case 4 %d %d %d %d\n", aim->y, aim->x, Deidara->f_a, Deidara->f_r);
+        *dir = 4;
+        return;
     }
 }
 
@@ -1837,19 +1850,6 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
     if (map[aim->y][aim->x].box != 1)
     {
         return 1;
-    }
-
-    if (Deidara->y == aim->y && Deidara->x == aim->x)
-    {
-        if (map[Saken->y][Saken->x].enemy_tunnel < 0 && my_abs(map[aim->y][aim->x].enemy_tunnel) > my_abs(map[Saken->y][Saken->x].enemy_tunnel))
-        {
-            *dir = 4;
-        }
-        else
-        {
-            *dir = 5;
-        }
-        return 0;
     }
 
     while (y != Deidara->y || x != Deidara->x)
@@ -1953,17 +1953,32 @@ int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, st
                 }
             }
             fprintf(stderr, "new dir is %d\n", *dir);
+            return 0;
         }
         else if (map[Deidara->y][Deidara->x].box == -2 && map[next.y][next.x].box == -2)
         {
             fprintf(stderr, "escape second if\n");
             get_out(map, Deidara, dir, h, w, -2);
             fprintf(stderr, "new dir is %d\n", *dir);
+            return 0;
         }
         else if ((map[Deidara->y][Deidara->x].box >= 1 || map[Deidara->y][Deidara->x].box < -1) && wait == -1 * map[next.y][next.x].box)
         {
             *dir = 5;
         }
+    }
+
+    if (Deidara->y == aim->y && Deidara->x == aim->x)
+    {
+        if (map[Saken->y][Saken->x].enemy_tunnel < 0 && my_abs(map[aim->y][aim->x].enemy_tunnel) > my_abs(map[Saken->y][Saken->x].enemy_tunnel))
+        {
+            *dir = 4;
+        }
+        else
+        {
+            *dir = 5;
+        }
+        return 0;
     }
     return 0;
 }
