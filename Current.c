@@ -70,7 +70,7 @@ void final_map(struct cell** map, struct bot* Deidara, struct bot* Saken, int h,
 int kill_bot(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* kill_aim, struct pos* enemy_aim, int h, int w);
 int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int* anti_timeout);
 
-void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir);
+void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir, int current_number);
 int target_acqured(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* aim, struct pos* enemy_aim, int h, int w, int* dir);
 int get_out(struct cell** map, struct bot* Deidara, int* dir, int h, int w, int tick);
 
@@ -316,7 +316,7 @@ int main(void)
         if (kill_command == 0)
         {
             fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
-            find_dir(map, Deidara, aim, h, w, &dir);
+            find_dir(map, Deidara, aim, h, w, &dir, current_number);
         }
         else
         {
@@ -325,7 +325,7 @@ int main(void)
             if (failure == 1)
             {
                 fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
-                find_dir(map, Deidara, aim, h, w, &dir);
+                find_dir(map, Deidara, aim, h, w, &dir, current_number);
             }
         }
 
@@ -1677,7 +1677,7 @@ int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_
 
 
 
-void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir)
+void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, int w, int* dir, int current_number)
 {
     int anti_timeout = 0;
     int y = aim->y;
@@ -1813,7 +1813,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
         }
     }
 
-    if (aim->y == Deidara->y && aim->x == Deidara->x)
+    if (aim->y == Deidara->y && aim->x == Deidara->x && current_number != 0)
     {
         fprintf(stderr, "Bomb plant case 1 %d %d \n", y, x);
         *dir = 4;
