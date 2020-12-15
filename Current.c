@@ -6,7 +6,7 @@
 
 struct cell
 {
-    int box, path, goal, delay, tunnel, enemy_tunnel, enemy_delay, enemy_path, enemy_goal, features;
+    int box, path, goal, delay, tunnel, enemy_tunnel, enemy_delay, enemy_path, enemy_goal, features, bomb_radius;
 };
 
 struct bot
@@ -28,7 +28,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number, stru
 
 void fill_entity(struct cell** map, struct bot* Deidara, struct bot* Saken, char ent_type, int p_id, int x, int y, int param_1, int param_2, int player_id, int h, int w, int coef, int* min_tick);
 void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int* min_tick);
-int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than);
+int fill_bomb_dir(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int less_than, int* min_tick);
 void fill_feature(struct cell** map, struct bot* Deidara, char ent_type, int x, int y, int coef);
 
 void read_features(struct cell** map, struct bot* Deidara, struct bot* Saken, int player_id, int p_id, int type);
@@ -54,6 +54,9 @@ void get_enemy_point(struct cell** map, int y, int x, int step, int prev, int h,
 
 void fill_enemy_tunnel(struct cell** map, struct bot* Saken, int h, int w);
 void get_enemy_tunnels(struct cell** map, struct bot* Saken, int y, int x, int deep, int h, int w);
+
+void anti_trap(struct cell** map, struct bot* Deidara, struct bot* Saken, int h, int w);
+int find_anti_trap(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_value, int h, int w, int* anti_timeout);
 
 void final_enemy_map(struct cell** map, struct bot* Saken, int h, int w, struct pos* enemy_aim);
 
@@ -258,10 +261,13 @@ int main(void)
         /*
         Change goals if dangerous tunnel
         */
-        fprintf(stderr, "Before anti_trap\n");
-        anti_trap();
-        fprintf(stderr, "After anti_trap\n");
-        print_map(map, h, w, 10);
+        if (Saken->x != -1)
+        {
+            fprintf(stderr, "Before anti_trap\n");
+            anti_trap(map, Deidara, Saken, h, w);
+            fprintf(stderr, "After anti_trap\n");
+            print_map(map, h, w, 10);
+        }
 
         /*
         Final enemy map
@@ -403,6 +409,7 @@ void fill_map(struct cell** map, char* line, int i, int j, int* box_number, stru
     map[i][j].tunnel = 0;
     map[i][j].enemy_tunnel = 0;
     map[i][j].features = 0;
+    map[i][j].bomb_radius = 0;
 }
 
 
@@ -463,9 +470,15 @@ void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_
 {
     int less_than = 0;
     if (player_id == p_id)
+    {
         less_than = 5 - Deidara->f_r;
+    }
     else
+    {
         less_than = 5 - Saken->f_r;
+    }
+
+    map[y][x].bomb_radius = param_2;
 
     if (player_id == p_id && Deidara->f_a == 0)
     {
@@ -475,44 +488,52 @@ void fill_bomb(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_
         }
     }
 
-    if (param_1 >= less_than)
+    int tick = param_1;
+    if (map[y][x].box < 0 && map[y][x].box > -1 * tick)
+    {
+        tick = map[y][x].box * -1;
+    }
+
+    if (tick >= less_than && tick != 1)
     {
         map[y][x].box = 50;
     }
     else
-        map[y][x].box = -1 * param_1;
+    {
+        map[y][x].box = -1 * tick;
+    }
     map[y][x].goal = -150;
 
     for (int i = 1; i <= param_2; i++)
     {
         int tmp_x = x + i;
         if (tmp_x >= w) break;
-        if (!fill_bomb_dir(map, tmp_x, y, param_1, less_than)) break;
+        if (!fill_bomb_dir(map, Deidara, Saken, p_id, tmp_x, y, tick, param_2, h, w, player_id, less_than, min_tick)) break;
     }
 
     for (int i = 1; i <= param_2; i++)
     {
         int tmp_x = x - i;
         if (tmp_x < 0) break;
-        if (!fill_bomb_dir(map, tmp_x, y, param_1, less_than)) break;
+        if (!fill_bomb_dir(map, Deidara, Saken, p_id, tmp_x, y, tick, param_2, h, w, player_id, less_than, min_tick)) break;
     }
 
     for (int i = 1; i <= param_2; i++)
     {
         int tmp_y = y + i;
         if (tmp_y >= h) break;
-        if (!fill_bomb_dir(map, x, tmp_y, param_1, less_than)) break;
+        if (!fill_bomb_dir(map, Deidara, Saken, p_id, x, tmp_y, tick, param_2, h, w, player_id, less_than, min_tick)) break;
     }
 
     for (int i = 1; i <= param_2; i++)
     {
         int tmp_y = y - i;
         if (tmp_y < 0) break;
-        if (!fill_bomb_dir(map, x, tmp_y, param_1, less_than)) break;
+        if (!fill_bomb_dir(map, Deidara, Saken, p_id, x, tmp_y, tick, param_2, h, w, player_id, less_than, min_tick)) break;
     }
 }
 
-int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than)
+int fill_bomb_dir(struct cell** map, struct bot* Deidara, struct bot* Saken, int p_id, int x, int y, int param_1, int param_2, int h, int w, int player_id, int less_than, int* min_tick)
 {
     if (map[y][x].box == 1)
     {
@@ -520,10 +541,11 @@ int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than)
             map[y][x].goal = -150;
         map[y][x].box = -1 * param_1;
     }
-    else if (map[y][x].box < 0)
+    else if (map[y][x].box < -1 * param_1 && map[y][x].bomb_radius == 0)
     {
-        if (map[y][x].box < -1 * param_1)
-            map[y][x].box = -1 * param_1;
+        if (param_1 >= less_than)
+            map[y][x].goal = -150;
+        map[y][x].box = -1 * param_1;
     }
     else if (map[y][x].box == 10)
     {
@@ -532,11 +554,39 @@ int fill_bomb_dir(struct cell** map, int x, int y, int param_1, int less_than)
             map[y][x].box = 50;
         }
         else
+        {
             map[y][x].box = -1 * param_1;
+        }
         return 0;
     }
+    else if (map[y][x].bomb_radius != 0)
+    {
+        int new_tick = 0;
+        if (y - 1 >= 0 && map[y - 1][x].box < 0 && map[y - 1][x].box > -1 * new_tick && map[y - 1][x].box != -1 * param_1)
+        {
+            new_tick = -1 * map[y - 1][x].box;
+        }
+        if (y + 1 < h && map[y + 1][x].box < 0 && map[y + 1][x].box > -1 * new_tick && map[y + 1][x].box != -1 * param_1)
+        {
+            new_tick = -1 *  map[y + 1][x].box;
+        }
+        if (x - 1 >= 0 && map[y][x - 1].box < 0 && map[y][x - 1].box > -1 * new_tick && map[y][x - 1].box != -1 * param_1)
+        {
+            new_tick = -1 * map[y][x - 1].box;
+        }
+        if (x + 1 < w && map[y][x + 1].box < 0 && map[y][x + 1].box > -1 * new_tick && map[y][x + 1].box != -1 * param_1)
+        {
+            new_tick = -1 * map[y][x + 1].box;
+        }
+        if (new_tick > param_1)
+        {
+            fill_bomb(map, Deidara, Saken, p_id, x, y, map[y][x].bomb_radius, param_1, h, w, player_id, min_tick);
+        }
+    }
     else
+    {
         return 0;
+    }
     return 1;
 }
 
@@ -1128,17 +1178,52 @@ void get_enemy_tunnels(struct cell** map, struct bot* Saken, int y, int x, int d
 
 
 
-void anti_trap()
+void anti_trap(struct cell** map, struct bot* Deidara, struct bot* Saken, int h, int w)
 {
     int trap_pos = 0;
     struct pos* tmp_aim = malloc(sizeof(struct pos));
+
     for (int i = 0; i < h; i++)
     {
         for (int j = 0; j < w; j++)
         {
             if (map[i][j].tunnel < 0)
             {
+                if (Deidara->f_j == 0 && Saken->f_t == 1)
+                {
+                    map[i][j].goal = 0;
+                    continue;
+                }
+                int anti_timeout = 0;
+                int fin_value = my_abs(map[i][j].tunnel) + 1;
+                tmp_aim->y = -1;
+                tmp_aim->x = -1;
+                if (Saken->f_r > Deidara->f_r)
+                {
+                    fin_value += Saken->f_r;
+                }
+                else
+                {
+                    fin_value += Deidara->f_r;
+                }
 
+                if (find_anti_trap(map, tmp_aim, i, j, fin_value, h, w, &anti_timeout) == 0)
+                {
+                    fprintf(stderr, "error in find_trap_pos\n");
+                    continue;
+                }
+
+                if (tmp_aim->y == -1)
+                {
+                    continue;
+                }
+
+                int safe_path = map[i][j].path + 1 + (map[tmp_aim->y][tmp_aim->x].tunnel % 100) - my_abs(map[i][j].tunnel);
+
+                if (map[tmp_aim->y][tmp_aim->x].enemy_path < safe_path)
+                {
+                    map[i][j].goal = 0;
+                }
             }
         }
     }
@@ -1159,7 +1244,7 @@ int find_anti_trap(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         }
         else if (my_abs(map[y - 1][x].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y - 1, x, fin_value, h, w, anti_timeout);
+            find_anti_trap(map, tmp_aim, y - 1, x, fin_value, h, w, anti_timeout);
         }
     }
     if (y + 1 < h)
@@ -1172,7 +1257,7 @@ int find_anti_trap(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         }
         else if (my_abs(map[y + 1][x].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y + 1, x, fin_value, h, w, anti_timeout);
+            find_anti_trap(map, tmp_aim, y + 1, x, fin_value, h, w, anti_timeout);
         }
     }
     if (x - 1 >= 0)
@@ -1185,7 +1270,7 @@ int find_anti_trap(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         }
         else if (my_abs(map[y][x - 1].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y, x - 1, fin_value, h, w, anti_timeout);
+            find_anti_trap(map, tmp_aim, y, x - 1, fin_value, h, w, anti_timeout);
         }
     }
     if (x + 1 < w)
@@ -1198,7 +1283,7 @@ int find_anti_trap(struct cell** map, struct pos* tmp_aim, int y, int x, int fin
         }
         else if (my_abs(map[y][x + 1].tunnel) == my_abs(map[y][x].tunnel) + 1)
         {
-            find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
+            find_anti_trap(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
         }
     }
     return 1;
