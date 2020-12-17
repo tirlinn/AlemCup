@@ -69,7 +69,7 @@ void adjust_box(struct cell** map, struct bot* Deidara, struct pos* enemy_aim, i
 int adjust_one_way(struct cell** map, struct situation* status, struct pos* enemy_aim, int y, int x, int h, int w);
 void adjust_quadrant(struct cell** map, struct situation* status, int y, int x, int h, int w);
 
-void find_tunnel_kill(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_next, struct situation* status, int h, int w, struct pos* tunnel_kill_pos);
+void find_tunnel_kill(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_next, struct situation* status, int h, int w, struct pos* tunnel_kill_pos, struct pos* tunnel_die_pos);
 
 void fill_enemy_box_2(struct cell** map, struct bot* Saken, struct pos* enemy_aim, int h, int w);
 void fill_bomb_enemy_2(struct cell** map, struct bot* Saken, int x, int y, int h, int w);
@@ -136,6 +136,7 @@ int main(void)
     struct pos* decoy_pos = malloc(sizeof(struct pos));
     struct pos* tp_on_map_pos = malloc(sizeof(struct pos));
     struct pos* tunnel_kill_pos = malloc(sizeof(struct pos));
+    struct pos* tunnel_die_pos = malloc(sizeof(struct pos));
     while (1)
     {
         int h, w, player_id, tick;
@@ -320,7 +321,7 @@ int main(void)
         struct pos* enemy_aim = malloc(sizeof(struct pos));
         struct pos* enemy_aim_1 = malloc(sizeof(struct pos));
         struct pos* enemy_next = malloc(sizeof(struct pos));
-
+        status->bad_next_predict = 1;
         if (Saken->x != -1)
         {
             enemy_aim->y = Saken->y;
@@ -339,17 +340,12 @@ int main(void)
             fprintf(stderr, "Before find enemy next\n");
             status->bad_next_predict = find_enemy_next(map, Saken, h, w, enemy_aim, enemy_next);
             fprintf(stderr, "After find enemy next\n");
+            fprintf(stderr, "Enemy next is %d %d\n", enemy_next->y, enemy_next->x);
+            fprintf(stderr, "Before adjust_priority\n");
             adjust_priority(map, Deidara, Saken, status, enemy_aim, h, w);
+            fprintf(stderr, "After adjust priority\n");
         }
 
-        /*
-        Tunnel kill case
-        */
-        
-        if (status->bad_next_predict != 1)
-        {
-            find_tunnel_kill(map, Deidara, Saken, enemy_next, status, h, w, tunnel_kill_pos);
-        }
 
         /*
         Enemy second goal
@@ -405,6 +401,17 @@ int main(void)
         final_map(map, Deidara, Saken, h, w, aim, enemy_aim, &min_tick);
         fprintf(stderr, "After final map\n");
         print_map(map, h, w, 8);
+
+        /*
+        Tunnel kill case
+        */
+        
+        if (status->bad_next_predict == 0 && map[enemy_next->y][enemy_next->x].surround == 3)
+        {
+            fprintf(stderr, "Before find tunnel kill\n");
+            find_tunnel_kill(map, Deidara, Saken, enemy_next, status, h, w, tunnel_kill_pos, tunnel_die_pos);
+            fprintf(stderr, "After find tunnel kill\n");
+        }
 
         /*
         Kill bot
@@ -478,10 +485,10 @@ int main(void)
             Deidara->f_t = 0;
             status->teleport = 0;
         }
-        else if (status->tunnel_kill == 1) ////????????????????????????????????????????????????????????????????????????????
+        else if (status->tunnel_kill == 1)
         {
             fprintf(stderr, "Final aim to tunnel kill is %d %d %d Enemy %d %d\n", map[trap_pos->y][trap_pos->x].goal, trap_pos->y, trap_pos->x, die_pos->y, die_pos->x);
-            int failure = tunnel_kill_acquired(map, Deidara, Saken, tunnel_kill_pos, h, w, &dir, status);
+            int failure = tunnel_kill_acquired(map, Deidara, Saken, tunnel_kill_pos, tunnel_die_pos, h, w, &dir, status);
             if (failure == 1)
             {
                 fprintf(stderr, "Final aim is %d %d %d\n", map[aim->y][aim->x].goal, aim->y, aim->x);
@@ -544,6 +551,7 @@ int main(void)
         free(enemy_aim_2_2);
         freentf(map, h, w, aim, enemy_aim, kill_aim, sector_count, tp_aim);
     }
+    free(tunnel_die_pos);
     free(tunnel_kill_pos);
     free(tp_on_map_pos);
     free(decoy_pos);
@@ -1556,6 +1564,10 @@ int find_enemy_next(struct cell** map, struct bot* Saken, int h, int w, struct p
     struct pos next = { -1, -1 };
     int fork = 0;
     int dir = 0;
+    if (enemy_aim->y == Saken->y && enemy_aim->x == Saken->x)
+    {
+        return 1;
+    }
     while (y != Saken->y || x != Saken->x)
     {
         fork = 0;
@@ -1603,8 +1615,6 @@ int find_enemy_next(struct cell** map, struct bot* Saken, int h, int w, struct p
         if (dir == 3) y--;
         if (dir == 0) x++;
         if (dir == 2) y++;
-        enemy_next->y = next.y;
-        enemy_next->x = next.x;
 
         if (fork >= 2) return 1;
         if (anti_timeout < 50) anti_timeout++;
@@ -1614,12 +1624,14 @@ int find_enemy_next(struct cell** map, struct bot* Saken, int h, int w, struct p
             return 1;
         }
     }
+    enemy_next->y = next.y;
+    enemy_next->x = next.x;
     return 0;
 }
 
 
 
-void find_tunnel_kill(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_next, struct situation* status, int h, int w, struct pos* tunnel_kill_pos)
+void find_tunnel_kill(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* enemy_next, struct situation* status, int h, int w, struct pos* tunnel_kill_pos, struct pos* tunnel_die_pos)
 {
     struct pos* tmp_aim = malloc(sizeof(struct pos));
     int anti_timeout = 1;
@@ -1631,18 +1643,23 @@ void find_tunnel_kill(struct cell** map, struct bot* Deidara, struct bot* Saken,
         free(tmp_aim);
         return;
     }
-    if (tmp_aim->y != -1 && map[tmp_aim->y][tmp_aim->x].path <= map[enemy_next->y][enemy_next->x].enemy_path)
+    fprintf(stderr, "Debugger 1 \n");
+    if (tmp_aim->y != -1 && Deidara->f_a >= 1 && map[tmp_aim->y][tmp_aim->x].path <= map[enemy_next->y][enemy_next->x].enemy_path)
     {
         status->tunnel_kill = 1;
         tunnel_kill_pos->y = tmp_aim->y;
         tunnel_kill_pos->x = tmp_aim->x;
+        tunnel_die_pos->y = enemy_next->y;
+        tunnel_die_pos->x = enemy_next->x;
     }
-    else if (Deidara->f_t == 1)
+    else if (Deidara->f_t == 1 && Deidara->f_a >= 1 && tmp_aim->y != -1 && (map[tmp_aim->y][tmp_aim->x].box != -2 || map[tmp_aim->y][tmp_aim->x].box != -1) )
     {
         status->teleport = 1;
         status->tunnel_kill = 1;
         tunnel_kill_pos->y = tmp_aim->y;
         tunnel_kill_pos->x = tmp_aim->x;
+        tunnel_die_pos->y = enemy_next->y;
+        tunnel_die_pos->x = enemy_next->x;
     }
 
     free(tmp_aim);
@@ -2422,39 +2439,39 @@ int find_trap_pos(struct cell** map, struct pos* tmp_aim, int y, int x, int fin_
     }
     if (y + 1 < h)
     {
-        if ((my_abs(map[y + 1][x].enemy_tunnel) == fin_value || my_abs(map[y + 1][x].enemy_tunnel) > 100) && map[y - 1][x].bomb_radius == 0)
+        if ((my_abs(map[y + 1][x].enemy_tunnel) == fin_value || my_abs(map[y + 1][x].enemy_tunnel) > 100) && map[y + 1][x].bomb_radius == 0)
         {
             tmp_aim->y = y + 1;
             tmp_aim->x = x;
             return 1;
         }
-        else if (my_abs(map[y + 1][x].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y - 1][x].bomb_radius == 0)
+        else if (my_abs(map[y + 1][x].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y + 1][x].bomb_radius == 0)
         {
             find_trap_pos(map, tmp_aim, y + 1, x, fin_value, h, w, anti_timeout);
         }
     }
     if (x - 1 >= 0)
     {
-        if ((my_abs(map[y][x - 1].enemy_tunnel) == fin_value || my_abs(map[y][x - 1].enemy_tunnel) > 100) && map[y - 1][x].bomb_radius == 0)
+        if ((my_abs(map[y][x - 1].enemy_tunnel) == fin_value || my_abs(map[y][x - 1].enemy_tunnel) > 100) && map[y][x - 1].bomb_radius == 0)
         {
             tmp_aim->y = y;
             tmp_aim->x = x - 1;
             return 1;
         }
-        else if (my_abs(map[y][x - 1].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y - 1][x].bomb_radius == 0)
+        else if (my_abs(map[y][x - 1].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y][x - 1].bomb_radius == 0)
         {
             find_trap_pos(map, tmp_aim, y, x - 1, fin_value, h, w, anti_timeout);
         }
     }
     if (x + 1 < w)
     {
-        if ((my_abs(map[y][x + 1].enemy_tunnel) == fin_value || my_abs(map[y][x + 1].enemy_tunnel) > 100) && map[y - 1][x].bomb_radius == 0)
+        if ((my_abs(map[y][x + 1].enemy_tunnel) == fin_value || my_abs(map[y][x + 1].enemy_tunnel) > 100) && map[y][x + 1].bomb_radius == 0)
         {
             tmp_aim->y = y;
             tmp_aim->x = x + 1;
             return 1;
         }
-        else if (my_abs(map[y][x + 1].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y - 1][x].bomb_radius == 0)
+        else if (my_abs(map[y][x + 1].enemy_tunnel) == my_abs(map[y][x].enemy_tunnel) + 1 && map[y][x + 1].bomb_radius == 0)
         {
             find_trap_pos(map, tmp_aim, y, x + 1, fin_value, h, w, anti_timeout);
         }
@@ -2642,7 +2659,7 @@ void find_dir(struct cell** map, struct bot* Deidara, struct pos* aim, int h, in
     }
 }
 
-int tunnel_kill_acquired(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* tunnel_kill_pos, int h, int w, int* dir, struct situation* status)
+int tunnel_kill_acquired(struct cell** map, struct bot* Deidara, struct bot* Saken, struct pos* tunnel_kill_pos, struct pos* tunnel_die_pos, int h, int w, int* dir, struct situation* status)
 {
     int anti_timeout = 0;
     int y = tunnel_kill_pos->y;
@@ -2726,7 +2743,7 @@ int tunnel_kill_acquired(struct cell** map, struct bot* Deidara, struct bot* Sak
     Escape with jump or tp if can't get out properly
     */
     if (((map[Deidara->y][Deidara->x].box == -1 || map[Deidara->y][Deidara->x].bomb_tick == 1) && next.y != -1 && map[next.y][next.x].box == -1) ||
-        ((map[Deidara->y][Deidara->x].box == -1 || map[Deidara->y][Deidara->x].bomb_tick == 1) && map[trap_pos->y][trap_pos->x].box == -1))
+        ((map[Deidara->y][Deidara->x].box == -1 || map[Deidara->y][Deidara->x].bomb_tick == 1) && map[tunnel_kill_pos->y][tunnel_kill_pos->x].box == -1))
     {
         fprintf(stderr, "escape first if\n");
         if (get_out(map, Deidara, dir, h, w, -1) == 1)
@@ -2775,8 +2792,19 @@ int tunnel_kill_acquired(struct cell** map, struct bot* Deidara, struct bot* Sak
     */
     if (Deidara->y == tunnel_kill_pos->y && Deidara->x == tunnel_kill_pos->x)
     {
-        *dir = 4;
-        status->tunnel_kill = 0;
+        if (Saken->y == tunnel_die_pos->y && Saken->x == tunnel_die_pos->x)
+        {
+            *dir = 4;
+            status->tunnel_kill = 0;
+        }
+        else if (my_abs_dif(Saken->y, tunnel_die_pos->y) + my_abs_dif(Saken->x, tunnel_die_pos->x) >= 2)
+        {
+            *dir = 5;
+        }
+        else
+        {
+            return 1;
+        }
     }
     return 0;
 }
